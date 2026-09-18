@@ -4,7 +4,7 @@
  */
 
 import type { JobDetails } from './job'
-import type { SendEmailPayload } from './email'
+import type { SendEmailPayload, EmailDispatchResult } from './email'
 import type { GoogleDriveFileItem, CVProfile, CVSyncResult } from './cv'
 
 export type ExtensionMessage =
@@ -21,4 +21,5 @@ export type ExtensionMessage =
   | { type: 'SYNC_CV_REQUEST'; payload?: { fileId?: string } }
   | { type: 'SYNC_CV_SUCCESS'; payload: CVSyncResult }
   | { type: 'SEND_GMAIL_REQUEST'; payload: SendEmailPayload }
+  | { type: 'SEND_GMAIL_SUCCESS'; payload: EmailDispatchResult }
   | { type: 'API_ERROR'; error: string }

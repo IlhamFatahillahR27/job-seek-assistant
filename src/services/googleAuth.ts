@@ -208,7 +208,7 @@ export class GoogleAuthService {
   private static async loginWithCustomClientId(clientId: string): Promise<AuthResult> {
     const redirectUrl = this.getRedirectUrl()
     const scopes = encodeURIComponent(
-      'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile'
+      'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/gmail.compose https://www.googleapis.com/auth/gmail.send'
     )
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(
       clientId

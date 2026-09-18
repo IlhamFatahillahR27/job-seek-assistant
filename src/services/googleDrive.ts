@@ -238,4 +238,73 @@ export class GoogleDriveService {
       content: arrayBuffer,
     }
   }
+
+  /**
+   * Download or export a file from Google Drive as a binary PDF ArrayBuffer
+   * Specifically designed for email attachments.
+   */
+  static async downloadFileAsPdf(
+    token: string,
+    fileId: string,
+    mimeType?: string,
+    fileName = 'Resume.pdf'
+  ): Promise<{ fileName: string; content: ArrayBuffer }> {
+    let pdfFileName = fileName
+    if (pdfFileName.toLowerCase().endsWith('.gdoc')) {
+      pdfFileName = pdfFileName.replace(/\.gdoc$/i, '.pdf')
+    } else if (!pdfFileName.toLowerCase().endsWith('.pdf')) {
+      pdfFileName = `${pdfFileName}.pdf`
+    }
+
+    if (token === 'demo_mock_token_12345') {
+      // Return a minimal valid PDF ArrayBuffer for testing & demo mode
+      const dummyPdfHeader = '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R/Resources<<>>>>endobj\nxref\n0 4\n0000000000 65535 f\n0000000009 00000 n\n0000000052 00000 n\n0000000101 00000 n\ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n185\n%%EOF'
+      const encoder = new TextEncoder()
+      const buffer = encoder.encode(dummyPdfHeader).buffer
+      return {
+        fileName: pdfFileName,
+        content: buffer,
+      }
+    }
+
+    // If Google Docs, export directly to application/pdf
+    if (mimeType === 'application/vnd.google-apps.document') {
+      const exportUrl = `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=application/pdf`
+      const response = await fetch(exportUrl, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(
+          `Gagal mengekspor Google Doc ke PDF (${response.status}): ${response.statusText}`
+        )
+      }
+
+      const buffer = await response.arrayBuffer()
+      return {
+        fileName: pdfFileName,
+        content: buffer,
+      }
+    }
+
+    // Default binary file download (e.g. PDF)
+    const downloadUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`
+    const response = await fetch(downloadUrl, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(`Gagal mengunduh berkas PDF (${response.status}): ${response.statusText}`)
+    }
+
+    const buffer = await response.arrayBuffer()
+    return {
+      fileName: pdfFileName,
+      content: buffer,
+    }
+  }
 }

@@ -31,6 +31,8 @@ export default defineManifest({
   ],
   host_permissions: [
     'https://generativelanguage.googleapis.com/*',
+    'https://gmail.googleapis.com/*',
+    'https://www.googleapis.com/*',
   ],
   oauth2: {
     client_id: '439773286903-pjobseekassistantclient.apps.googleusercontent.com',
@@ -38,6 +40,8 @@ export default defineManifest({
       'https://www.googleapis.com/auth/drive.readonly',
       'https://www.googleapis.com/auth/userinfo.email',
       'https://www.googleapis.com/auth/userinfo.profile',
+      'https://www.googleapis.com/auth/gmail.compose',
+      'https://www.googleapis.com/auth/gmail.send',
     ],
   },
   side_panel: {

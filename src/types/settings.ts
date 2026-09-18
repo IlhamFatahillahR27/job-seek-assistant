@@ -3,6 +3,7 @@
  */
 
 import type { GeminiModelInfo } from './analysis'
+import type { EmailLanguage } from './email'
 
 export type ThemeMode = 'light' | 'dark' | 'system'
 
@@ -25,6 +26,7 @@ export interface AppSettings {
   googleAccessToken?: string
   googleTokenExpiresAt?: number
   useDemoDriveMode: boolean
+  defaultEmailLanguage?: EmailLanguage
   theme: ThemeMode
   activeTab: TabKey
   autoExtractOnOpen: boolean
@@ -45,6 +47,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   googleAccessToken: '',
   googleTokenExpiresAt: 0,
   useDemoDriveMode: false,
+  defaultEmailLanguage: 'auto',
   theme: 'light',
   activeTab: 'analysis',
   autoExtractOnOpen: false,

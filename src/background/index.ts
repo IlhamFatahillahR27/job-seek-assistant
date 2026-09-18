@@ -5,9 +5,12 @@ import { GoogleAuthService } from '@/services/googleAuth'
 import { GoogleDriveService } from '@/services/googleDrive'
 import { CVParserService } from '@/services/cvParser'
 import { CVSyncService } from '@/services/cvSync'
+import { MimeBuilderService, type MimeAttachment } from '@/services/mimeBuilder'
+import { GmailClientService, GmailClientError } from '@/services/gmailClient'
 import { storageService, STORAGE_KEYS } from '@/services/storage'
 import type { ExtensionMessage } from '@/types/messages'
 import type { CVProfile } from '@/types/cv'
+import type { EmailDispatchResult, EmailDispatchHistoryItem } from '@/types/email'
 
 chrome.runtime.onInstalled.addListener(async () => {
   console.log('[JobSeekAssistant] Extension installed/updated.')
@@ -128,6 +131,115 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendRe
           }
           const response = await chrome.tabs.sendMessage(activeTab.id, { type: 'SCRAPE_JOB_PAGE' })
           return response
+        }
+
+        case 'SEND_GMAIL_REQUEST': {
+          const payload = message.payload
+          if (!payload.recipientEmail?.trim()) {
+            throw new Error('Alamat email penerima tidak boleh kosong.')
+          }
+          if (!payload.subject?.trim()) {
+            throw new Error('Subjek email tidak boleh kosong.')
+          }
+          if (!payload.body?.trim()) {
+            throw new Error('Isi email tidak boleh kosong.')
+          }
+
+          let token = await GoogleAuthService.getValidToken(false)
+          if (!token) {
+            throw new Error('Google Workspace belum terhubung. Silakan hubungkan akun Google Anda di tab Pengaturan.')
+          }
+
+          let attachment: MimeAttachment | undefined
+          if (payload.attachmentFileId) {
+            try {
+              const downloadedPdf = await GoogleDriveService.downloadFileAsPdf(
+                token,
+                payload.attachmentFileId,
+                payload.attachmentMimeType,
+                payload.attachmentFileName || 'CV_Resume.pdf'
+              )
+              attachment = {
+                filename: downloadedPdf.fileName,
+                mimeType: 'application/pdf',
+                data: downloadedPdf.content,
+              }
+            } catch (attachErr: any) {
+              console.warn('[Background] Failed to download PDF attachment:', attachErr)
+              throw new Error(`Gagal melampirkan berkas CV dari Google Drive: ${attachErr.message}`)
+            }
+          }
+
+          const rawBase64Url = MimeBuilderService.buildRfc2822Base64Url({
+            to: payload.recipientEmail,
+            subject: payload.subject,
+            body: payload.body,
+            attachment,
+          })
+
+          const executeDispatch = async (activeToken: string) => {
+            if (payload.action === 'draft') {
+              return await GmailClientService.createDraft(activeToken, rawBase64Url)
+            } else {
+              return await GmailClientService.sendMessage(activeToken, rawBase64Url)
+            }
+          }
+
+          let dispatchResult: any
+          try {
+            dispatchResult = await executeDispatch(token)
+          } catch (err: any) {
+            // Auto-refresh token retry on 401
+            if (err instanceof GmailClientError && err.isAuthError) {
+              console.warn('[Background] 401 received, invalidating token and retrying...')
+              await GoogleAuthService.invalidateToken(token)
+              const freshToken = await GoogleAuthService.getValidToken(false)
+              if (freshToken) {
+                token = freshToken
+                dispatchResult = await executeDispatch(freshToken)
+              } else {
+                throw err
+              }
+            } else {
+              throw err
+            }
+          }
+
+          const successResult: EmailDispatchResult = {
+            success: true,
+            action: payload.action,
+            draftId: dispatchResult.draftId,
+            messageId: dispatchResult.messageId,
+            dispatchedAt: new Date().toISOString(),
+          }
+
+          // Persist to email dispatch history
+          try {
+            const history = await storageService.get<EmailDispatchHistoryItem[]>(
+              STORAGE_KEYS.EMAIL_DRAFTS,
+              []
+            )
+            const historyItem: EmailDispatchHistoryItem = {
+              id: `dispatch_${Date.now()}`,
+              recipientEmail: payload.recipientEmail,
+              subject: payload.subject,
+              action: payload.action,
+              status: 'success',
+              draftId: dispatchResult.draftId,
+              messageId: dispatchResult.messageId,
+              attachmentIncluded: !!attachment,
+              attachmentName: attachment?.filename,
+              dispatchedAt: successResult.dispatchedAt,
+            }
+            await storageService.set(STORAGE_KEYS.EMAIL_DRAFTS, [historyItem, ...history].slice(0, 15))
+          } catch (histErr) {
+            console.warn('[Background] Failed to save dispatch history:', histErr)
+          }
+
+          return {
+            type: 'SEND_GMAIL_SUCCESS',
+            payload: successResult,
+          }
         }
 
         default:
