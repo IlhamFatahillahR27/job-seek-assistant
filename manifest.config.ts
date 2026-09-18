@@ -29,6 +29,9 @@ export default defineManifest({
     'activeTab',
     'identity',
   ],
+  host_permissions: [
+    'https://generativelanguage.googleapis.com/*',
+  ],
   oauth2: {
     client_id: '439773286903-pjobseekassistantclient.apps.googleusercontent.com',
     scopes: [

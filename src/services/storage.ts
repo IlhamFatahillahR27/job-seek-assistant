@@ -8,6 +8,7 @@ export const STORAGE_KEYS = {
   SETTINGS: 'job_seek_settings',
   CV_PROFILE: 'job_seek_cv_profile',
   CURRENT_JOB: 'job_seek_current_job',
+  CURRENT_ANALYSIS: 'job_seek_current_analysis',
   ANALYSIS_HISTORY: 'job_seek_analysis_history',
   EMAIL_DRAFTS: 'job_seek_email_drafts',
   THEME: 'job_seek_theme',

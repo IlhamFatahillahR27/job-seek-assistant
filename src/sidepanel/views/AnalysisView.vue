@@ -15,12 +15,23 @@ import {
   Briefcase,
   Save,
 } from 'lucide-vue-next'
-import { useAppSettings, useCVProfile } from '@/composables/useStorageState'
+import { useAppSettings, useCVProfile, useNavigation } from '@/composables/useStorageState'
 import { useJobExtractor } from '@/composables/useJobExtractor'
+import { useJobAnalysis } from '@/composables/useJobAnalysis'
+import AnalysisResultCard from '../components/AnalysisResultCard.vue'
 import type { JobDetails } from '@/types/job'
 
 const { settings } = useAppSettings()
 const { cvProfile } = useCVProfile()
+const { setActiveTab } = useNavigation()
+const {
+  currentAnalysis,
+  isAnalyzing,
+  analysisError,
+  cooldownTimer,
+  runAnalysis,
+  clearAnalysis,
+} = useJobAnalysis()
 const {
   currentJob,
   isExtracting,
@@ -76,9 +87,25 @@ const handleSave = async () => {
 
 const handleReset = async () => {
   await resetJob()
+  await clearAnalysis()
   editableJob.value = createEmptyJob()
   showManualForm.value = false
   isSaved.value = false
+}
+
+const handleRunAnalysis = async (forceDemo = false) => {
+  try {
+    if (editableJob.value.title || editableJob.value.description) {
+      await updateJob(editableJob.value)
+    }
+    await runAnalysis(editableJob.value, undefined, { forceDemo })
+  } catch {
+    // Handled reactively by useJobAnalysis.analysisError
+  }
+}
+
+const handleClearAnalysis = async () => {
+  await clearAnalysis()
 }
 
 const handleOpenManual = () => {
@@ -341,24 +368,130 @@ const getPlatformBadge = (platform?: string) => {
       </div>
     </div>
 
-    <!-- Milestone 4 Bridge CTA Card -->
-    <div class="rounded-xl border border-dashed border-gray-300 p-4 text-center dark:border-gray-700">
-      <Sparkles class="mx-auto h-6 w-6 text-indigo-500 dark:text-indigo-400" />
-      <h4 class="mt-2 text-xs font-semibold text-gray-800 dark:text-gray-200">
-        Analisis Relevansi & Gap Pengalaman
-      </h4>
-      <p class="mt-1 text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
-        {{ editableJob.title ? `Lowongan "${editableJob.title}" siap diproses.` : 'Ekstrak atau isi lowongan terlebih dahulu.' }}
-        Fitur evaluasi kecocokan AI (0-100%), skill gaps, dan tips interview akan aktif pada <strong>Milestone 4</strong>.
+    <!-- Active Analysis Result Card -->
+    <AnalysisResultCard
+      v-if="currentAnalysis"
+      :analysis="currentAnalysis"
+      :is-analyzing="isAnalyzing"
+      @reanalyze="handleRunAnalysis()"
+      @clear="handleClearAnalysis"
+    />
+
+    <!-- AI Analysis Trigger Card (When no active analysis) -->
+    <div
+      v-else
+      class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-800 space-y-3"
+    >
+      <div class="flex items-center space-x-2 text-indigo-600 dark:text-indigo-400">
+        <Sparkles class="h-4 w-4" />
+        <h3 class="text-xs font-semibold uppercase tracking-wider">
+          Analisis Relevansi & Gap Pengalaman AI
+        </h3>
+      </div>
+
+      <p class="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
+        Evaluasi kecocokan kualifikasi CV Anda terhadap lowongan ini menggunakan Google Gemini AI dengan prinsip <strong>Zero-Hallucination</strong>.
       </p>
-      <button
-        type="button"
-        disabled
-        class="mt-3 inline-flex items-center justify-center space-x-1.5 rounded-lg bg-gray-100 px-3.5 py-1.5 text-[11px] font-medium text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-500"
+
+      <!-- Cooldown / Rate Limit Banner -->
+      <div
+        v-if="cooldownTimer > 0"
+        class="rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300 space-y-1"
       >
-        <Sparkles class="h-3.5 w-3.5" />
-        <span>Mulai Analisis AI (Milestone 4)</span>
-      </button>
+        <div class="flex items-center space-x-1.5 font-semibold text-amber-800 dark:text-amber-300">
+          <AlertCircle class="h-4 w-4 shrink-0 text-amber-600" />
+          <span>Jeda Cooldown Rate Limit (429) Aktif: {{ cooldownTimer }} detik</span>
+        </div>
+        <p class="text-[11px] leading-relaxed">
+          Google Gemini membatasi 15 permintaan/menit pada paket free-tier (reset otomatis setiap hari). Anda dapat menunggu jeda di atas atau langsung menggunakan <strong>Mode Demo</strong> di bawah.
+        </p>
+      </div>
+
+      <!-- Analysis Error Banner -->
+      <div
+        v-if="analysisError && cooldownTimer === 0"
+        class="rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300 flex items-start space-x-2"
+      >
+        <AlertCircle class="h-4 w-4 shrink-0 text-red-600 mt-0.5" />
+        <div class="text-[11px] leading-relaxed">
+          <p class="font-semibold">Gagal Menjalankan Analisis</p>
+          <p>{{ analysisError }}</p>
+        </div>
+      </div>
+
+      <!-- Prerequisite Status Checklist -->
+      <div class="rounded-lg bg-gray-50 dark:bg-gray-750 p-2.5 space-y-2 text-[11px]">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-1.5">
+            <CheckCircle v-if="cvProfile" class="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+            <AlertCircle v-else class="h-3.5 w-3.5 text-amber-500" />
+            <span class="text-gray-700 dark:text-gray-300">
+              Profil CV: {{ cvProfile ? cvProfile.fileName || 'Tersedia' : 'Belum Dipilih' }}
+            </span>
+          </div>
+          <button
+            v-if="!cvProfile"
+            type="button"
+            @click="setActiveTab('cv')"
+            class="text-indigo-600 dark:text-indigo-400 font-semibold hover:underline"
+          >
+            Pilih CV
+          </button>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-1.5">
+            <CheckCircle v-if="editableJob.title" class="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+            <AlertCircle v-else class="h-3.5 w-3.5 text-amber-500" />
+            <span class="text-gray-700 dark:text-gray-300">
+              Lowongan: {{ editableJob.title ? editableJob.title : 'Belum Ada' }}
+            </span>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-1.5">
+            <CheckCircle v-if="settings.geminiApiKey" class="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+            <AlertCircle v-else class="h-3.5 w-3.5 text-gray-400" />
+            <span class="text-gray-700 dark:text-gray-300">
+              Gemini API Key: {{ settings.geminiApiKey ? 'Terkonfigurasi' : 'Belum Diisi' }}
+            </span>
+          </div>
+          <button
+            v-if="!settings.geminiApiKey"
+            type="button"
+            @click="setActiveTab('settings')"
+            class="text-indigo-600 dark:text-indigo-400 font-semibold hover:underline"
+          >
+            Isi Key
+          </button>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="space-y-2 pt-1">
+        <button
+          type="button"
+          @click="handleRunAnalysis(false)"
+          :disabled="isAnalyzing || !cvProfile || (!editableJob.title && !editableJob.description) || cooldownTimer > 0"
+          class="flex w-full items-center justify-center space-x-2 rounded-lg bg-indigo-600 px-3.5 py-2.5 text-xs font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': isAnalyzing }" />
+          <span>{{ isAnalyzing ? 'Sedang Menganalisis dengan Gemini AI...' : 'Mulai Analisis Kecocokan AI' }}</span>
+        </button>
+
+        <!-- Demo Mode Alternative Button -->
+        <button
+          v-if="!settings.geminiApiKey || cooldownTimer > 0"
+          type="button"
+          @click="handleRunAnalysis(true)"
+          :disabled="isAnalyzing || !cvProfile || (!editableJob.title && !editableJob.description)"
+          class="flex w-full items-center justify-center space-x-1.5 rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-medium text-purple-700 hover:bg-purple-100 dark:border-purple-900/60 dark:bg-purple-950/30 dark:text-purple-300 disabled:opacity-50 transition-colors"
+        >
+          <Sparkles class="h-3.5 w-3.5 text-purple-600" />
+          <span>Coba Analisis Mode Demo (Simulasi)</span>
+        </button>
+      </div>
     </div>
   </div>
 </template>

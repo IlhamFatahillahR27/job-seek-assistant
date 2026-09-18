@@ -2,6 +2,8 @@
  * Extension Settings and Preferences Type Definitions
  */
 
+import type { GeminiModelInfo } from './analysis'
+
 export type ThemeMode = 'light' | 'dark' | 'system'
 
 export type TabKey = 'analysis' | 'email' | 'cv' | 'settings'
@@ -11,6 +13,10 @@ export type GoogleAuthStatus = 'disconnected' | 'connecting' | 'connected' | 'er
 export interface AppSettings {
   geminiApiKey: string
   geminiModel: string
+  availableGeminiModels?: GeminiModelInfo[]
+  geminiKeyValid?: boolean
+  geminiKeyCheckedAt?: string
+  useDemoGeminiMode?: boolean
   googleAuthStatus: GoogleAuthStatus
   googleUserEmail?: string
   googleUserName?: string
@@ -26,7 +32,11 @@ export interface AppSettings {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   geminiApiKey: '',
-  geminiModel: 'gemini-1.5-flash',
+  geminiModel: 'gemini-2.0-flash',
+  availableGeminiModels: [],
+  geminiKeyValid: false,
+  geminiKeyCheckedAt: '',
+  useDemoGeminiMode: false,
   googleAuthStatus: 'disconnected',
   googleUserEmail: '',
   googleUserName: '',

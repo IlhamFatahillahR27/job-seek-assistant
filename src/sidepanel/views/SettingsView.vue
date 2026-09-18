@@ -16,20 +16,50 @@ import {
   LogOut,
   Copy,
   Check,
+  RefreshCw,
+  ShieldCheck,
 } from 'lucide-vue-next'
 import { useAppSettings, useGoogleAuth } from '@/composables/useStorageState'
 import { storageService } from '@/services/storage'
 import { GoogleAuthService } from '@/services/googleAuth'
+import { GeminiClientService } from '@/services/geminiClient'
 import type { ThemeMode } from '@/types/settings'
+import type { ConnectionValidationResult, GeminiModelInfo } from '@/types/analysis'
 
 const { settings, updateSettings, resetSettings } = useAppSettings()
 const { login, logout } = useGoogleAuth()
 
 const showApiKey = ref(false)
 const inputApiKey = ref(settings.value.geminiApiKey)
-const selectedModel = ref(settings.value.geminiModel || 'gemini-1.5-flash')
+const selectedModel = ref(settings.value.geminiModel || 'gemini-2.0-flash')
+const inputUseDemoGemini = ref(settings.value.useDemoGeminiMode || false)
+const availableModelsList = ref<GeminiModelInfo[]>(settings.value.availableGeminiModels || [])
 const saveSuccess = ref<string | null>(null)
 const isSaving = ref(false)
+
+// Gemini API Key Validation State
+const isValidatingKey = ref(false)
+const keyValidationResult = ref<ConnectionValidationResult | null>(null)
+
+watch(
+  () => settings.value.availableGeminiModels,
+  (val) => {
+    if (val && val.length > 0) {
+      availableModelsList.value = val
+    }
+  },
+  { immediate: true }
+)
+
+watch(
+  () => settings.value.geminiModel,
+  (val) => {
+    if (val) {
+      selectedModel.value = val
+    }
+  },
+  { immediate: true }
+)
 
 // Google Workspace State
 const isGoogleActionLoading = ref(false)
@@ -104,12 +134,42 @@ const handleToggleDemoMode = async () => {
   }
 }
 
+const handleValidateApiKey = async () => {
+  isValidatingKey.value = true
+  keyValidationResult.value = null
+  try {
+    const res = await GeminiClientService.validateApiKey(inputApiKey.value)
+    keyValidationResult.value = res
+    if (res.valid) {
+      const models = res.availableModels || []
+      availableModelsList.value = models
+      // If current selectedModel is not in the models list, pick the best default
+      if (models.length > 0 && !models.some((m) => m.id === selectedModel.value)) {
+        selectedModel.value = GeminiClientService.getBestDefaultModel(models)
+      }
+      await updateSettings({
+        geminiApiKey: inputApiKey.value.trim(),
+        geminiModel: selectedModel.value,
+        availableGeminiModels: models,
+        geminiKeyValid: true,
+        geminiKeyCheckedAt: res.testedAt,
+      })
+      saveSuccess.value = `Koneksi Google Gemini API terverifikasi (${models.length} model aktif)!`
+      setTimeout(() => (saveSuccess.value = null), 3500)
+    }
+  } finally {
+    isValidatingKey.value = false
+  }
+}
+
 const handleSaveSettings = async () => {
   isSaving.value = true
   try {
     await updateSettings({
       geminiApiKey: inputApiKey.value.trim(),
       geminiModel: selectedModel.value,
+      availableGeminiModels: availableModelsList.value,
+      useDemoGeminiMode: inputUseDemoGemini.value,
       googleClientId: inputGoogleClientId.value.trim(),
       useDemoDriveMode: inputUseDemoMode.value,
     })
@@ -187,23 +247,113 @@ const handleClearAllStorage = async () => {
             <Eye v-else class="h-3.5 w-3.5" />
           </button>
         </div>
-        <p class="mt-1 text-[10px] text-gray-500 dark:text-gray-400">
-          Kunci API disimpan aman di <code>chrome.storage.local</code> perangkat Anda sendiri.
-        </p>
+        <div class="mt-1 flex items-center justify-between text-[10px]">
+          <span class="text-gray-500 dark:text-gray-400">
+            Tersimpan aman di <code>chrome.storage.local</code>.
+          </span>
+          <span
+            v-if="settings.geminiKeyValid && settings.geminiApiKey"
+            class="inline-flex items-center space-x-1 text-emerald-600 dark:text-emerald-400 font-medium"
+          >
+            <ShieldCheck class="h-3 w-3" />
+            <span>Terverifikasi</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Instant Connection Validation Button & Result -->
+      <div class="space-y-2">
+        <button
+          type="button"
+          @click="handleValidateApiKey"
+          :disabled="isValidatingKey || !inputApiKey.trim()"
+          class="flex w-full items-center justify-center space-x-1.5 rounded-lg border border-indigo-200 bg-indigo-50/70 px-3 py-1.5 text-xs font-medium text-indigo-700 shadow-sm hover:bg-indigo-100 disabled:opacity-50 dark:border-indigo-900/60 dark:bg-indigo-950/40 dark:text-indigo-300 transition-colors"
+        >
+          <RefreshCw class="h-3.5 w-3.5" :class="{ 'animate-spin': isValidatingKey }" />
+          <span>{{ isValidatingKey ? 'Memvalidasi API Key ke Google...' : 'Uji Koneksi API Key' }}</span>
+        </button>
+
+        <!-- Validation Result Feedback Banner -->
+        <div
+          v-if="keyValidationResult"
+          class="rounded-lg p-2.5 text-xs space-y-1"
+          :class="keyValidationResult.valid
+            ? 'border border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300'
+            : 'border border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300'"
+        >
+          <div class="flex items-center space-x-1.5 font-semibold">
+            <CheckCircle v-if="keyValidationResult.valid" class="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+            <AlertCircle v-else class="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />
+            <span>{{ keyValidationResult.valid ? 'Koneksi Berhasil!' : 'Validasi Gagal' }}</span>
+          </div>
+          <p v-if="keyValidationResult.valid" class="text-[11px] leading-relaxed">
+            API Key aktif dan siap memanggil model Gemini AI.
+            <span v-if="keyValidationResult.models && keyValidationResult.models.length > 0">
+              Model terdeteksi: {{ keyValidationResult.models.slice(0, 3).join(', ') }}.
+            </span>
+          </p>
+          <p v-else class="text-[11px] leading-relaxed">
+            {{ keyValidationResult.errorMessage }}
+          </p>
+        </div>
       </div>
 
       <div>
-        <label class="block text-[11px] font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Model Gemini
-        </label>
+        <div class="flex items-center justify-between mb-1">
+          <label class="text-[11px] font-medium text-gray-700 dark:text-gray-300">
+            Model Gemini (ListModels)
+          </label>
+          <span
+            v-if="availableModelsList.length > 0"
+            class="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium"
+          >
+            {{ availableModelsList.length }} model tersedia
+          </span>
+        </div>
+
         <select
           v-model="selectedModel"
-          class="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+          class="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 font-mono"
         >
-          <option value="gemini-1.5-flash">Gemini 1.5 Flash (Cepat & Direkomendasikan)</option>
-          <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-          <option value="gemini-1.5-pro">Gemini 1.5 Pro (Penalaran Kompleks)</option>
+          <!-- Dynamic options from ModelService.ListModels -->
+          <template v-if="availableModelsList.length > 0">
+            <option
+              v-for="m in availableModelsList"
+              :key="m.id"
+              :value="m.id"
+            >
+              {{ m.displayName && m.displayName !== m.id ? `${m.displayName} (${m.id})` : m.id }}
+            </option>
+          </template>
+
+          <!-- Fallback options if ListModels has not been fetched yet -->
+          <template v-else>
+            <option value="gemini-2.0-flash">Gemini 2.0 Flash (Direkomendasikan)</option>
+            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+            <option value="gemini-1.5-flash-latest">Gemini 1.5 Flash (Latest)</option>
+            <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+          </template>
         </select>
+        <p class="mt-1 text-[10px] text-gray-500 dark:text-gray-400">
+          Model diverifikasi langsung dari <code>ModelService.ListModels</code> Google AI Studio.
+        </p>
+      </div>
+
+      <!-- Demo Mode Alternative for AI -->
+      <div class="pt-2 border-t border-gray-100 dark:border-gray-700/60 flex items-start justify-between">
+        <div class="pr-2">
+          <label class="text-[11px] font-medium text-gray-800 dark:text-gray-200">
+            Mode Simulasi Gemini AI (Demo Mode)
+          </label>
+          <p class="text-[10px] text-gray-500 dark:text-gray-400">
+            Uji alur evaluasi kecocokan CV dan draf email tanpa API Key Google AI Studio.
+          </p>
+        </div>
+        <input
+          type="checkbox"
+          v-model="inputUseDemoGemini"
+          class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 mt-0.5 cursor-pointer"
+        />
       </div>
 
       <button
