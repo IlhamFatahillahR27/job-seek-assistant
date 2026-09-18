@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import {
   Key,
   Eye,
   EyeOff,
   CheckCircle,
+  AlertCircle,
   Save,
   RotateCcw,
   Sun,
@@ -13,11 +14,12 @@ import {
   ExternalLink,
   Cloud,
   LogOut,
-  ChevronDown,
-  ChevronUp,
+  Copy,
+  Check,
 } from 'lucide-vue-next'
 import { useAppSettings, useGoogleAuth } from '@/composables/useStorageState'
 import { storageService } from '@/services/storage'
+import { GoogleAuthService } from '@/services/googleAuth'
 import type { ThemeMode } from '@/types/settings'
 
 const { settings, updateSettings, resetSettings } = useAppSettings()
@@ -32,15 +34,47 @@ const isSaving = ref(false)
 // Google Workspace State
 const isGoogleActionLoading = ref(false)
 const googleErrorMsg = ref<string | null>(null)
-const showAdvancedAuth = ref(false)
 const inputGoogleClientId = ref(settings.value.googleClientId || '')
 const inputUseDemoMode = ref(settings.value.useDemoDriveMode || false)
+const redirectUri = ref(GoogleAuthService.getRedirectUrl())
+const isCopied = ref(false)
+
+// Keep inputGoogleClientId in sync when storage initializes
+watch(
+  () => settings.value.googleClientId,
+  (val) => {
+    if (val && !inputGoogleClientId.value) {
+      inputGoogleClientId.value = val
+    }
+  }
+)
+
+watch(
+  () => settings.value.useDemoDriveMode,
+  (val) => {
+    inputUseDemoMode.value = val
+  }
+)
+
+const copyRedirectUri = async () => {
+  try {
+    await navigator.clipboard.writeText(redirectUri.value)
+    isCopied.value = true
+    setTimeout(() => (isCopied.value = false), 2500)
+  } catch (err) {
+    console.error('Failed to copy redirect URI:', err)
+  }
+}
 
 const handleGoogleLogin = async () => {
   isGoogleActionLoading.value = true
   googleErrorMsg.value = null
   try {
-    await login(inputGoogleClientId.value.trim() || undefined)
+    const cid = inputGoogleClientId.value.trim()
+    if (cid) {
+      await updateSettings({ googleClientId: cid })
+    }
+    await login(cid || undefined)
     saveSuccess.value = 'Akun Google Workspace berhasil terhubung!'
     setTimeout(() => (saveSuccess.value = null), 3000)
   } catch (err: any) {
@@ -236,17 +270,57 @@ const handleClearAllStorage = async () => {
         </button>
       </div>
 
-      <!-- If Disconnected: Show Connect Button & Info -->
-      <div v-else class="space-y-2.5">
+      <!-- If Disconnected: Show Connect Button & Configuration -->
+      <div v-else class="space-y-3">
         <p class="text-[11px] text-gray-500 dark:text-gray-400">
           Hubungkan akun Google Workspace Anda untuk memilih dan menyinkronkan CV dari Google Drive serta mengirim lamaran via Gmail.
         </p>
 
+        <!-- Error Alert Banner -->
         <div
           v-if="googleErrorMsg"
-          class="rounded-lg bg-rose-50 p-2 text-[11px] text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+          class="rounded-lg bg-rose-50 border border-rose-200 p-2.5 text-[11px] text-rose-800 dark:bg-rose-950/40 dark:border-rose-900/60 dark:text-rose-300 space-y-1"
         >
-          {{ googleErrorMsg }}
+          <div class="flex items-center space-x-1.5 font-semibold text-rose-900 dark:text-rose-200">
+            <AlertCircle class="h-3.5 w-3.5 shrink-0" />
+            <span>Koneksi Gagal</span>
+          </div>
+          <p class="leading-relaxed">{{ googleErrorMsg }}</p>
+        </div>
+
+        <!-- Google OAuth Client ID Input -->
+        <div class="space-y-1">
+          <label class="block text-[11px] font-medium text-gray-700 dark:text-gray-300">
+            Google OAuth 2.0 Client ID (Web Application)
+          </label>
+          <input
+            v-model="inputGoogleClientId"
+            type="text"
+            placeholder="1234567890-abcdef.apps.googleusercontent.com"
+            class="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 font-mono"
+          />
+        </div>
+
+        <!-- Authorized Redirect URI Box with Copy Button -->
+        <div class="rounded-lg bg-gray-50 dark:bg-gray-750 p-2.5 space-y-1.5 text-[11px]">
+          <div class="flex items-center justify-between text-gray-700 dark:text-gray-300 font-medium">
+            <span>Authorized Redirect URI Google:</span>
+            <button
+              type="button"
+              @click="copyRedirectUri"
+              class="flex items-center space-x-1 text-indigo-600 dark:text-indigo-400 hover:underline font-semibold"
+            >
+              <Check v-if="isCopied" class="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+              <Copy v-else class="h-3 w-3" />
+              <span>{{ isCopied ? 'Tersalin!' : 'Salin URI' }}</span>
+            </button>
+          </div>
+          <div class="rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-1 font-mono text-[10px] text-indigo-700 dark:text-indigo-300 select-all break-all">
+            {{ redirectUri }}
+          </div>
+          <p class="text-[10px] text-gray-500 dark:text-gray-400 leading-relaxed">
+            *Pastikan di Google Cloud Console, OAuth Client ID dibuat bertipe <strong>Web application</strong> dan URL di atas ditambahkan ke <em>Authorized redirect URIs</em>.
+          </p>
         </div>
 
         <button
@@ -258,51 +332,23 @@ const handleClearAllStorage = async () => {
           <Cloud class="h-3.5 w-3.5" />
           <span>{{ isGoogleActionLoading ? 'Menghubungkan...' : 'Hubungkan Akun Google Workspace' }}</span>
         </button>
-      </div>
 
-      <!-- Advanced Connection Options -->
-      <div class="pt-2 border-t border-gray-100 dark:border-gray-700/60">
-        <button
-          type="button"
-          @click="showAdvancedAuth = !showAdvancedAuth"
-          class="flex w-full items-center justify-between text-[11px] font-medium text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400"
-        >
-          <span>Opsi Pengembang & Mode Simulasi</span>
-          <ChevronDown v-if="!showAdvancedAuth" class="h-3 w-3" />
-          <ChevronUp v-else class="h-3 w-3" />
-        </button>
-
-        <div v-if="showAdvancedAuth" class="mt-2.5 space-y-2.5 pt-1">
-          <!-- Toggle Demo Mode -->
-          <div class="flex items-start justify-between">
-            <div class="pr-2">
-              <label class="text-[11px] font-medium text-gray-800 dark:text-gray-200">
-                Mode Simulasi Google Drive (Demo)
-              </label>
-              <p class="text-[10px] text-gray-500 dark:text-gray-400">
-                Gunakan berkas demo Google Drive untuk evaluasi instan tanpa perlu akun Google Cloud Console.
-              </p>
-            </div>
-            <input
-              type="checkbox"
-              v-model="inputUseDemoMode"
-              @change="handleToggleDemoMode"
-              class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 mt-0.5"
-            />
-          </div>
-
-          <!-- Custom Client ID -->
-          <div>
-            <label class="block text-[10px] font-medium text-gray-700 dark:text-gray-300 mb-0.5">
-              Custom Google OAuth Client ID (Opsional)
+        <!-- Demo Mode Alternative -->
+        <div class="pt-2 border-t border-gray-100 dark:border-gray-700/60 flex items-start justify-between">
+          <div class="pr-2">
+            <label class="text-[11px] font-medium text-gray-800 dark:text-gray-200">
+              Mode Simulasi Google Drive (Demo)
             </label>
-            <input
-              v-model="inputGoogleClientId"
-              type="text"
-              placeholder="12345-abc.apps.googleusercontent.com"
-              class="w-full rounded-lg border border-gray-200 bg-white px-2 py-1 text-[11px] text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 font-mono"
-            />
+            <p class="text-[10px] text-gray-500 dark:text-gray-400">
+              Coba langsung fitur CV Drive & parsing tanpa setup Google Cloud Console.
+            </p>
           </div>
+          <input
+            type="checkbox"
+            v-model="inputUseDemoMode"
+            @change="handleToggleDemoMode"
+            class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 mt-0.5 cursor-pointer"
+          />
         </div>
       </div>
     </div>

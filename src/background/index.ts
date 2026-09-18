@@ -118,6 +118,18 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendRe
           }
         }
 
+        case 'SCRAPE_JOB_PAGE': {
+          const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true })
+          if (!activeTab || !activeTab.id) {
+            throw new Error('Tidak ada tab aktif yang ditemukan.')
+          }
+          if (activeTab.url?.startsWith('chrome://') || activeTab.url?.startsWith('chrome-extension://') || activeTab.url?.startsWith('edge://')) {
+            throw new Error('Halaman sistem peramban tidak dapat diekstrak. Silakan buka halaman lowongan kerja pada website publik.')
+          }
+          const response = await chrome.tabs.sendMessage(activeTab.id, { type: 'SCRAPE_JOB_PAGE' })
+          return response
+        }
+
         default:
           return null
       }

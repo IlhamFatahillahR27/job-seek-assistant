@@ -17,12 +17,14 @@ import {
   useGoogleAuth,
   useDriveCV,
   useAppSettings,
+  useNavigation,
 } from '@/composables/useStorageState'
 import type { CVProfile, GoogleDriveFileItem } from '@/types/cv'
 
 const { cvProfile, saveCVProfile, clearCVProfile } = useCVProfile()
 const { settings } = useAppSettings()
 const { login, isConnecting } = useGoogleAuth()
+const { setActiveTab } = useNavigation()
 const {
   driveFiles,
   isListing,
@@ -74,10 +76,17 @@ const setNotice = (text: string, type: 'success' | 'info' | 'error' = 'success',
 // Open Google Drive Picker Modal
 const handleOpenDrivePicker = async () => {
   if (!isGoogleConnected.value) {
+    if (!settings.value.googleClientId && !settings.value.useDemoDriveMode) {
+      setNotice('Silakan masukkan Google Client ID atau centang Mode Demo di tab Pengaturan.', 'info', 5000)
+      await setActiveTab('settings')
+      return
+    }
+
     try {
       await login()
-    } catch {
-      setNotice('Gagal menghubungkan Google Workspace. Silakan periksa tab Pengaturan.', 'error')
+    } catch (err: any) {
+      setNotice(err.message || 'Gagal menghubungkan Google Workspace.', 'error')
+      await setActiveTab('settings')
       return
     }
   }
@@ -87,6 +96,20 @@ const handleOpenDrivePicker = async () => {
     await loadDriveFiles(driveSearchQuery.value)
   } catch (err: any) {
     setNotice(err.message || 'Gagal memuat berkas Google Drive.', 'error')
+  }
+}
+
+const handleConnectClick = async () => {
+  if (!settings.value.googleClientId && !settings.value.useDemoDriveMode) {
+    await setActiveTab('settings')
+    setNotice('Silakan masukkan Google Client ID atau centang Mode Demo di tab Pengaturan.', 'info', 5000)
+    return
+  }
+  try {
+    await login()
+  } catch (err: any) {
+    setNotice(err.message || 'Gagal menghubungkan Google Workspace.', 'error')
+    await setActiveTab('settings')
   }
 }
 
@@ -241,7 +264,7 @@ const formatFileSize = (bytes?: number | string) => {
       </div>
       <button
         type="button"
-        @click="login()"
+        @click="handleConnectClick"
         :disabled="isConnecting"
         class="rounded-lg bg-indigo-600 px-2.5 py-1 text-[10px] font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50 transition-colors"
       >

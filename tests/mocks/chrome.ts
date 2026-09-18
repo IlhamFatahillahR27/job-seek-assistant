@@ -143,6 +143,32 @@ export function setupChromeMock() {
         callback({ id: 'mock_user_1', email: 'pelamar@gmail.com' })
       }),
     },
+    tabs: {
+      query: vi.fn().mockResolvedValue([
+        {
+          id: 101,
+          url: 'https://www.linkedin.com/jobs/view/123456789',
+          active: true,
+          currentWindow: true,
+        },
+      ]),
+      sendMessage: vi.fn().mockResolvedValue({
+        type: 'SCRAPE_JOB_SUCCESS',
+        payload: {
+          id: 'job_mock_1',
+          url: 'https://www.linkedin.com/jobs/view/123456789',
+          title: 'Senior Frontend Engineer',
+          company: 'TechCorp Indonesia',
+          location: 'Jakarta (Hybrid)',
+          workplaceType: 'Hybrid',
+          description: 'Mencari engineer berbakat dengan Vue 3 & TypeScript.',
+          requirements: 'Pengalaman 3+ tahun di Vue.js.',
+          recruiterEmail: 'hr@techcorp.id',
+          platform: 'linkedin',
+          extractedAt: new Date().toISOString(),
+        },
+      }),
+    },
   }
 
   ;(globalThis as any).chrome = chromeMock

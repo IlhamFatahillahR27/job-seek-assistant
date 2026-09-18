@@ -1,4 +1,4 @@
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, getCurrentInstance } from 'vue'
 import { storageService, STORAGE_KEYS } from '@/services/storage'
 import {
   type AppSettings,
@@ -9,50 +9,66 @@ import {
 import type { CVProfile } from '@/types/cv'
 import type { JobDetails } from '@/types/job'
 
+function onMountedSafe(callback: () => Promise<void> | void) {
+  if (getCurrentInstance()) {
+    onMounted(callback)
+  } else {
+    callback()
+  }
+}
+
 // Shared reactive state singletons so multiple components share identical state
 const settingsState = ref<AppSettings>({ ...DEFAULT_SETTINGS })
 const cvProfileState = ref<CVProfile | null>(null)
 const currentJobState = ref<JobDetails | null>(null)
 const activeTabState = ref<TabKey>('analysis')
 const isInitialized = ref(false)
+let initPromise: Promise<void> | null = null
 
 /**
  * Initialize all persistent state from storage once
  */
 export async function initializeStorageState(): Promise<void> {
   if (isInitialized.value) return
+  if (initPromise) return initPromise
 
-  const [savedSettings, savedCV, savedJob] = await Promise.all([
-    storageService.get<AppSettings>(STORAGE_KEYS.SETTINGS, { ...DEFAULT_SETTINGS }),
-    storageService.get<CVProfile | null>(STORAGE_KEYS.CV_PROFILE, null),
-    storageService.get<JobDetails | null>(STORAGE_KEYS.CURRENT_JOB, null),
-  ])
+  initPromise = (async () => {
+    const [savedSettings, savedCV, savedJob] = await Promise.all([
+      storageService.get<AppSettings>(STORAGE_KEYS.SETTINGS, { ...DEFAULT_SETTINGS }),
+      storageService.get<CVProfile | null>(STORAGE_KEYS.CV_PROFILE, null),
+      storageService.get<JobDetails | null>(STORAGE_KEYS.CURRENT_JOB, null),
+    ])
 
-  settingsState.value = savedSettings
-  cvProfileState.value = savedCV
-  currentJobState.value = savedJob
-  if (savedSettings.activeTab) {
-    activeTabState.value = savedSettings.activeTab
-  }
-
-  // Apply initial theme class
-  applyThemeClass(savedSettings.theme)
-
-  isInitialized.value = true
-
-  // Listen for storage changes from other tabs or background worker
-  storageService.addChangeListener((changes) => {
-    if (changes[STORAGE_KEYS.SETTINGS]?.newValue) {
-      settingsState.value = changes[STORAGE_KEYS.SETTINGS].newValue
-      applyThemeClass(settingsState.value.theme)
+    settingsState.value = savedSettings
+    cvProfileState.value = savedCV
+    if (currentJobState.value === null) {
+      currentJobState.value = savedJob
     }
-    if (changes[STORAGE_KEYS.CV_PROFILE]) {
-      cvProfileState.value = changes[STORAGE_KEYS.CV_PROFILE].newValue ?? null
+    if (savedSettings.activeTab) {
+      activeTabState.value = savedSettings.activeTab
     }
-    if (changes[STORAGE_KEYS.CURRENT_JOB]) {
-      currentJobState.value = changes[STORAGE_KEYS.CURRENT_JOB].newValue ?? null
-    }
-  })
+
+    // Apply initial theme class
+    applyThemeClass(savedSettings.theme)
+
+    isInitialized.value = true
+
+    // Listen for storage changes from other tabs or background worker
+    storageService.addChangeListener((changes) => {
+      if (changes[STORAGE_KEYS.SETTINGS]?.newValue) {
+        settingsState.value = changes[STORAGE_KEYS.SETTINGS].newValue
+        applyThemeClass(settingsState.value.theme)
+      }
+      if (changes[STORAGE_KEYS.CV_PROFILE]) {
+        cvProfileState.value = changes[STORAGE_KEYS.CV_PROFILE].newValue ?? null
+      }
+      if (changes[STORAGE_KEYS.CURRENT_JOB]) {
+        currentJobState.value = changes[STORAGE_KEYS.CURRENT_JOB].newValue ?? null
+      }
+    })
+  })()
+
+  return initPromise
 }
 
 function applyThemeClass(theme: ThemeMode) {
@@ -77,7 +93,7 @@ function applyThemeClass(theme: ThemeMode) {
 export function useAppSettings() {
   const loading = ref(!isInitialized.value)
 
-  onMounted(async () => {
+  onMountedSafe(async () => {
     if (!isInitialized.value) {
       await initializeStorageState()
     }
@@ -113,7 +129,7 @@ export function useAppSettings() {
 export function useCVProfile() {
   const loading = ref(!isInitialized.value)
 
-  onMounted(async () => {
+  onMountedSafe(async () => {
     if (!isInitialized.value) {
       await initializeStorageState()
     }
@@ -380,3 +396,35 @@ export function useDriveCV() {
     syncDriveCV,
   }
 }
+
+/**
+ * Composable for Current Job Details
+ */
+export function useCurrentJob() {
+  const loading = ref(!isInitialized.value)
+
+  onMountedSafe(async () => {
+    if (!isInitialized.value) {
+      await initializeStorageState()
+    }
+    loading.value = false
+  })
+
+  const saveCurrentJob = async (job: JobDetails) => {
+    currentJobState.value = job
+    await storageService.set(STORAGE_KEYS.CURRENT_JOB, job)
+  }
+
+  const clearCurrentJob = async () => {
+    currentJobState.value = null
+    await storageService.remove(STORAGE_KEYS.CURRENT_JOB)
+  }
+
+  return {
+    currentJob: currentJobState,
+    loading,
+    saveCurrentJob,
+    clearCurrentJob,
+  }
+}
+

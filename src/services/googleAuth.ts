@@ -127,6 +127,16 @@ export class GoogleAuthService {
   }
 
   /**
+   * Get the exact extension redirect URI for Google Cloud Console configuration
+   */
+  static getRedirectUrl(): string {
+    if (typeof chrome !== 'undefined' && chrome.identity?.getRedirectURL) {
+      return chrome.identity.getRedirectURL()
+    }
+    return 'https://<extension-id>.chromiumapp.org/'
+  }
+
+  /**
    * Interactive Login Flow
    */
   static async login(customClientId?: string): Promise<AuthResult> {
@@ -148,34 +158,55 @@ export class GoogleAuthService {
       return { token: 'demo_mock_token_12345', profile: demoProfile }
     }
 
-    // If custom client ID provided or stored, use launchWebAuthFlow
-    const clientId = customClientId || settings.googleClientId
+    // 1. Check if custom client ID is provided or stored
+    let clientId = customClientId?.trim() || settings.googleClientId?.trim()
+
+    // 2. Also check if manifest has a configured (non-placeholder) client_id
+    if (!clientId && typeof chrome !== 'undefined' && chrome.runtime?.getManifest) {
+      const manifestClientId = chrome.runtime.getManifest()?.oauth2?.client_id
+      if (manifestClientId && !manifestClientId.includes('pjobseekassistantclient')) {
+        clientId = manifestClientId.trim()
+      }
+    }
+
+    // If client ID is available, use launchWebAuthFlow (standard across all browsers and unpacked extensions)
     if (
       clientId &&
-      clientId.trim().length > 0 &&
+      clientId.length > 0 &&
       typeof chrome !== 'undefined' &&
       typeof chrome.identity?.launchWebAuthFlow === 'function'
     ) {
-      return await this.loginWithCustomClientId(clientId.trim())
+      return await this.loginWithCustomClientId(clientId)
     }
 
-    // Default: Chrome Extension getAuthToken
-    const token = await this.getValidToken(true)
-    if (!token) {
-      throw new Error('Tidak dapat memperoleh token otentikasi dari Google.')
+    // Try Chrome Extension getAuthToken if in a signed-in Chrome profile
+    try {
+      const token = await this.getValidToken(true)
+      if (token) {
+        const profile = await this.fetchUserProfile(token)
+        await this.saveAuthSuccess(token, profile)
+        return { token, profile }
+      }
+    } catch (err: any) {
+      console.warn('[GoogleAuthService] getAuthToken failed:', err)
+      if (!clientId) {
+        throw new Error(
+          'OAuth Client ID belum dikonfigurasi. Masukkan Google Client ID Anda pada kolom di bawah atau centang Mode Simulasi (Demo).'
+        )
+      }
+      throw err
     }
 
-    const profile = await this.fetchUserProfile(token)
-    await this.saveAuthSuccess(token, profile)
-
-    return { token, profile }
+    throw new Error(
+      'OAuth Client ID belum dikonfigurasi. Masukkan Google Client ID Anda pada kolom di bawah atau centang Mode Simulasi (Demo).'
+    )
   }
 
   /**
    * Login using launchWebAuthFlow for custom GCP Client IDs
    */
   private static async loginWithCustomClientId(clientId: string): Promise<AuthResult> {
-    const redirectUrl = chrome.identity.getRedirectURL()
+    const redirectUrl = this.getRedirectUrl()
     const scopes = encodeURIComponent(
       'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile'
     )
@@ -190,9 +221,14 @@ export class GoogleAuthService {
         { url: authUrl, interactive: true },
         async (responseUrl) => {
           if (chrome.runtime.lastError || !responseUrl) {
-            return reject(
-              new Error(chrome.runtime.lastError?.message || 'Login Google dibatalkan.')
-            )
+            const rawMsg = chrome.runtime.lastError?.message || 'Login Google dibatalkan.'
+            if (rawMsg.includes('canceled') || rawMsg.includes('user cancelled')) {
+              return reject(new Error('Login dibatalkan oleh pengguna.'))
+            }
+            if (rawMsg.includes('bad_client_id') || rawMsg.includes('invalid_client')) {
+              return reject(new Error('Client ID tidak valid. Periksa kembali OAuth Client ID di Google Cloud Console.'))
+            }
+            return reject(new Error(`Login Google gagal: ${rawMsg}`))
           }
 
           try {
@@ -203,6 +239,10 @@ export class GoogleAuthService {
             const expiresIn = hashParams.get('expires_in')
 
             if (!accessToken) {
+              const errorDesc = hashParams.get('error_description') || hashParams.get('error')
+              if (errorDesc) {
+                return reject(new Error(`Google OAuth error: ${decodeURIComponent(errorDesc)}`))
+              }
               return reject(new Error('Format respons Google OAuth tidak valid.'))
             }
 
