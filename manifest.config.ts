@@ -3,8 +3,9 @@ import pkg from './package.json'
 
 export default defineManifest({
   manifest_version: 3,
-  name: pkg.name,
+  name: 'Job Seek Assistant',
   version: pkg.version,
+  description: 'AI-Powered Job Application Assistant with CV Grounding and Gmail Integration',
   icons: {
     48: 'public/logo.png',
   },
@@ -12,7 +13,11 @@ export default defineManifest({
     default_icon: {
       48: 'public/logo.png',
     },
-    default_popup: 'src/popup/index.html',
+    default_title: 'Buka Job Seek Assistant',
+  },
+  background: {
+    service_worker: 'src/background/index.ts',
+    type: 'module',
   },
   content_scripts: [{
     js: ['src/content/main.ts'],
@@ -20,7 +25,8 @@ export default defineManifest({
   }],
   permissions: [
     'sidePanel',
-    'contentSettings',
+    'storage',
+    'activeTab',
   ],
   side_panel: {
     default_path: 'src/sidepanel/index.html',
