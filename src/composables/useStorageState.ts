@@ -169,3 +169,214 @@ export function useTheme() {
     applyThemeClass,
   }
 }
+
+/**
+ * Composable for Google Workspace Authentication
+ */
+export function useGoogleAuth() {
+  const isConnecting = ref(false)
+  const authError = ref<string | null>(null)
+
+  const login = async (customClientId?: string) => {
+    isConnecting.value = true
+    authError.value = null
+    try {
+      const { GoogleAuthService } = await import('@/services/googleAuth')
+      const result = await GoogleAuthService.login(customClientId)
+      await useAppSettings().updateSettings({
+        googleAuthStatus: 'connected',
+        googleUserEmail: result.profile.email,
+        googleUserName: result.profile.name,
+        googleUserAvatar: result.profile.picture,
+        googleAccessToken: result.token,
+      })
+      return result
+    } catch (err: any) {
+      authError.value = err.message || 'Gagal menghubungkan akun Google'
+      await useAppSettings().updateSettings({
+        googleAuthStatus: 'error',
+      })
+      throw err
+    } finally {
+      isConnecting.value = false
+    }
+  }
+
+  const logout = async () => {
+    isConnecting.value = true
+    authError.value = null
+    try {
+      const { GoogleAuthService } = await import('@/services/googleAuth')
+      await GoogleAuthService.logout()
+      await useAppSettings().updateSettings({
+        googleAuthStatus: 'disconnected',
+        googleUserEmail: '',
+        googleUserName: '',
+        googleUserAvatar: '',
+        googleAccessToken: '',
+        googleTokenExpiresAt: 0,
+      })
+    } finally {
+      isConnecting.value = false
+    }
+  }
+
+  const checkAuth = async () => {
+    try {
+      const { GoogleAuthService } = await import('@/services/googleAuth')
+      const res = await GoogleAuthService.checkAuthStatus()
+      if (res.status === 'connected' && res.profile) {
+        await useAppSettings().updateSettings({
+          googleAuthStatus: 'connected',
+          googleUserEmail: res.profile.email,
+          googleUserName: res.profile.name,
+          googleUserAvatar: res.profile.picture,
+        })
+      } else {
+        await useAppSettings().updateSettings({
+          googleAuthStatus: 'disconnected',
+        })
+      }
+      return res
+    } catch {
+      return { status: 'disconnected' }
+    }
+  }
+
+  return {
+    settings: settingsState,
+    isConnecting,
+    authError,
+    login,
+    logout,
+    checkAuth,
+  }
+}
+
+/**
+ * Composable for Google Drive CV operations
+ */
+export function useDriveCV() {
+  const isListing = ref(false)
+  const isDownloading = ref(false)
+  const isSyncing = ref(false)
+  const driveError = ref<string | null>(null)
+  const driveFiles = ref<import('@/types/cv').GoogleDriveFileItem[]>([])
+
+  const loadDriveFiles = async (query?: string) => {
+    isListing.value = true
+    driveError.value = null
+    try {
+      const { GoogleAuthService } = await import('@/services/googleAuth')
+      const { GoogleDriveService } = await import('@/services/googleDrive')
+      const token = await GoogleAuthService.getValidToken(false)
+      if (!token) {
+        throw new Error('Silakan hubungkan akun Google Workspace terlebih dahulu.')
+      }
+
+      const files = await GoogleDriveService.listFiles(token, query)
+      driveFiles.value = files
+      return files
+    } catch (err: any) {
+      driveError.value = err.message || 'Gagal memuat berkas Google Drive'
+      throw err
+    } finally {
+      isListing.value = false
+    }
+  }
+
+  const selectAndSaveDriveCV = async (file: import('@/types/cv').GoogleDriveFileItem) => {
+    isDownloading.value = true
+    driveError.value = null
+    try {
+      const { GoogleAuthService } = await import('@/services/googleAuth')
+      const { GoogleDriveService } = await import('@/services/googleDrive')
+      const { CVParserService } = await import('@/services/cvParser')
+
+      const token = await GoogleAuthService.getValidToken(false)
+      if (!token) {
+        throw new Error('Google Workspace belum terhubung.')
+      }
+
+      const downloaded = await GoogleDriveService.downloadFileContent(
+        token,
+        file.id,
+        file.mimeType,
+        file.name
+      )
+
+      let rawText = ''
+      if (typeof downloaded.content === 'string') {
+        rawText = downloaded.content
+      } else {
+        rawText = await CVParserService.extractTextFromPdf(downloaded.content)
+      }
+
+      if (!rawText.trim()) {
+        throw new Error('Dokumen yang dipilih tidak memuat teks yang dapat diproses.')
+      }
+
+      const profile = CVParserService.parseTextToProfile(rawText, {
+        fileName: downloaded.fileName,
+        fileId: downloaded.fileId,
+        source: 'google_drive',
+        mimeType: downloaded.mimeType,
+        checksum: downloaded.checksum,
+        driveModifiedTime: downloaded.modifiedTime,
+        fileSize: typeof downloaded.content !== 'string' ? downloaded.content.byteLength : undefined,
+      })
+
+      await useCVProfile().saveCVProfile(profile)
+      return profile
+    } catch (err: any) {
+      driveError.value = err.message || 'Gagal mengunduh atau mengekstrak CV'
+      throw err
+    } finally {
+      isDownloading.value = false
+    }
+  }
+
+  const syncDriveCV = async () => {
+    const { cvProfile } = useCVProfile()
+    if (!cvProfile.value || cvProfile.value.source !== 'google_drive') {
+      return {
+        status: 'not_drive' as const,
+        message: 'CV saat ini bukan bersumber dari Google Drive.',
+      }
+    }
+
+    isSyncing.value = true
+    driveError.value = null
+    try {
+      const { GoogleAuthService } = await import('@/services/googleAuth')
+      const { CVSyncService } = await import('@/services/cvSync')
+
+      const token = await GoogleAuthService.getValidToken(false)
+      if (!token) {
+        throw new Error('Google Workspace belum terhubung.')
+      }
+
+      const result = await CVSyncService.syncWithDrive(token, cvProfile.value)
+      if (result.updatedProfile) {
+        cvProfileState.value = result.updatedProfile
+      }
+      return result
+    } catch (err: any) {
+      driveError.value = err.message || 'Gagal menyinkronkan CV'
+      throw err
+    } finally {
+      isSyncing.value = false
+    }
+  }
+
+  return {
+    driveFiles,
+    isListing,
+    isDownloading,
+    isSyncing,
+    driveError,
+    loadDriveFiles,
+    selectAndSaveDriveCV,
+    syncDriveCV,
+  }
+}

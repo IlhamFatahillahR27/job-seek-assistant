@@ -27,11 +27,34 @@ export interface CVSkillCategory {
   items: string[]
 }
 
+export interface GoogleDriveFileItem {
+  id: string
+  name: string
+  mimeType: string
+  modifiedTime?: string
+  size?: string
+  iconLink?: string
+}
+
+export type CVSyncStatus = 'up_to_date' | 'updated' | 'not_drive' | 'error'
+
+export interface CVSyncResult {
+  status: CVSyncStatus
+  message: string
+  updatedProfile?: CVProfile
+  driveModifiedTime?: string
+}
+
 export interface CVProfile {
   id: string
   fileName: string
   fileId?: string // Google Drive File ID
   source: 'google_drive' | 'manual_paste'
+  mimeType?: string
+  checksum?: string
+  driveModifiedTime?: string
+  lastSyncCheck?: string
+  fileSize?: number
   lastModified?: string
   parsedAt: string
   rawText: string

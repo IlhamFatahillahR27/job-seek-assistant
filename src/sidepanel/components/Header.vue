@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Sparkles, Sun, Moon, Key, FileCheck, FileX } from 'lucide-vue-next'
+import { Sparkles, Sun, Moon, Key, FileCheck, FileX, Cloud, CloudOff } from 'lucide-vue-next'
 import { useAppSettings, useCVProfile, useTheme } from '@/composables/useStorageState'
 
 const { settings } = useAppSettings()
@@ -9,6 +9,7 @@ const { toggleTheme } = useTheme()
 
 const hasApiKey = computed(() => !!settings.value.geminiApiKey?.trim())
 const hasCV = computed(() => !!cvProfile.value?.rawText?.trim())
+const isGoogleConnected = computed(() => settings.value.googleAuthStatus === 'connected')
 const isDark = computed(() => settings.value.theme === 'dark')
 </script>
 
@@ -27,10 +28,23 @@ const isDark = computed(() => settings.value.theme === 'dark')
     </div>
 
     <!-- Right Controls: Status Indicators & Theme Switcher -->
-    <div class="flex items-center space-x-2">
+    <div class="flex items-center space-x-1.5">
+      <!-- Google Workspace Status Badge -->
+      <div
+        class="flex items-center space-x-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors"
+        :class="isGoogleConnected
+          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+          : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'"
+        :title="isGoogleConnected ? `Google Workspace Terhubung: ${settings.googleUserEmail}` : 'Google Workspace Belum Terhubung'"
+      >
+        <Cloud v-if="isGoogleConnected" class="h-3 w-3" />
+        <CloudOff v-else class="h-3 w-3" />
+        <span class="hidden sm:inline">{{ isGoogleConnected ? 'Google' : 'No Sync' }}</span>
+      </div>
+
       <!-- Gemini API Key Status Badge -->
       <div
-        class="flex items-center space-x-1 rounded-full px-2 py-0.5 text-xs font-medium transition-colors"
+        class="flex items-center space-x-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors"
         :class="hasApiKey 
           ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' 
           : 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'"
@@ -42,7 +56,7 @@ const isDark = computed(() => settings.value.theme === 'dark')
 
       <!-- CV Loaded Status Badge -->
       <div
-        class="flex items-center space-x-1 rounded-full px-2 py-0.5 text-xs font-medium transition-colors"
+        class="flex items-center space-x-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors"
         :class="hasCV 
           ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400' 
           : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'"

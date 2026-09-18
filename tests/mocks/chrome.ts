@@ -128,6 +128,21 @@ export function setupChromeMock() {
     sidePanel: {
       setPanelBehavior: vi.fn().mockResolvedValue(undefined),
     },
+    identity: {
+      getAuthToken: vi.fn((options: any, callback: (token?: string) => void) => {
+        callback('mock_oauth2_token_abc123')
+      }),
+      removeCachedAuthToken: vi.fn((details: any, callback?: () => void) => {
+        if (callback) callback()
+      }),
+      launchWebAuthFlow: vi.fn((details: any, callback: (responseUrl?: string) => void) => {
+        callback('https://mock-ext-id.chromiumapp.org/#access_token=mock_flow_token_999&expires_in=3600')
+      }),
+      getRedirectURL: vi.fn((path?: string) => `https://mock-ext-id.chromiumapp.org/${path || ''}`),
+      getProfileUserInfo: vi.fn((details: any, callback: (user: any) => void) => {
+        callback({ id: 'mock_user_1', email: 'pelamar@gmail.com' })
+      }),
+    },
   }
 
   ;(globalThis as any).chrome = chromeMock

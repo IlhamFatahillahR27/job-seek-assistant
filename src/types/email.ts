@@ -3,11 +3,13 @@
  */
 
 export type EmailTone = 'formal' | 'project' | 'concise'
+export type EmailLanguage = 'id' | 'en' | 'auto'
 
 export interface EmailDraft {
   id: string
   jobId?: string
   tone: EmailTone
+  language?: EmailLanguage
   recipientEmail: string
   subject: string
   body: string

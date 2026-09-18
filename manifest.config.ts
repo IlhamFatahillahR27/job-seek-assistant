@@ -27,7 +27,16 @@ export default defineManifest({
     'sidePanel',
     'storage',
     'activeTab',
+    'identity',
   ],
+  oauth2: {
+    client_id: '439773286903-pjobseekassistantclient.apps.googleusercontent.com',
+    scopes: [
+      'https://www.googleapis.com/auth/drive.readonly',
+      'https://www.googleapis.com/auth/userinfo.email',
+      'https://www.googleapis.com/auth/userinfo.profile',
+    ],
+  },
   side_panel: {
     default_path: 'src/sidepanel/index.html',
   },

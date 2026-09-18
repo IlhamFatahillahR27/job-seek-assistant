@@ -15,6 +15,10 @@ export interface AppSettings {
   googleUserEmail?: string
   googleUserName?: string
   googleUserAvatar?: string
+  googleClientId?: string
+  googleAccessToken?: string
+  googleTokenExpiresAt?: number
+  useDemoDriveMode: boolean
   theme: ThemeMode
   activeTab: TabKey
   autoExtractOnOpen: boolean
@@ -27,6 +31,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   googleUserEmail: '',
   googleUserName: '',
   googleUserAvatar: '',
+  googleClientId: '',
+  googleAccessToken: '',
+  googleTokenExpiresAt: 0,
+  useDemoDriveMode: false,
   theme: 'light',
   activeTab: 'analysis',
   autoExtractOnOpen: false,
