@@ -169,6 +169,18 @@ Matriks penanganan error lengkap dapat dipelajari di [`docs/testing/error-matrix
 
 ---
 
+## 🚀 Publikasi ke Web Store (Chrome & Edge)
+
+Panduan komprehensif untuk mempublikasikan ekstensi ke toko peramban resmi:
+- **Panduan Publikasi Toko**: [`docs/deployment/store-publishing-guide.md`](docs/deployment/store-publishing-guide.md) (Langkah upload, checklist aset, dan justifikasi permission).
+- **Kebijakan Privasi Publik**: [`PRIVACY_POLICY.md`](PRIVACY_POLICY.md) (Wajib dicantumkan saat upload ke Google & Microsoft).
+- **Paket ZIP Rilis**: Siap diunggah langsung dari `release/crx-job-seek-assistant-1.0.0.zip` (dihasilkan otomatis via `npm run build`).
+- **Biaya Pendaftaran Developer**:
+  - **Microsoft Edge Add-ons**: **GRATIS ($0 / Free)**.
+  - **Chrome Web Store**: **$5 USD** (sekali bayar seumur hidup via Google Payments).
+
+---
+
 ## 🔒 Keamanan & Perlindungan Privasi
 
 1. **Local Storage First**: Seluruh data profil CV, riwayat analisis, dan draft email disimpan secara lokal di peramban pengguna menggunakan `chrome.storage.local` dan tidak dikirimkan ke server pihak ketiga mana pun selain Google APIs resmi.
