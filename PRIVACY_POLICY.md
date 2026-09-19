@@ -27,20 +27,26 @@ The extension communicates directly with official Google APIs using the credenti
 
 ---
 
-## 4. Permissions Justification
-- `sidePanel`: Renders the assistant interface in the browser side panel.
-- `storage`: Preserves application settings and CV cache locally on your machine.
-- `activeTab`: Extracts job details from the current tab only when you initiate the extraction action.
+## 4. Permissions & Host Justification
+- `sidePanel`: Renders the assistant interface in the browser side panel beside the active job listing.
+- `storage`: Preserves application settings, API keys, and CV cache locally on your machine (`chrome.storage.local`).
+- `activeTab`: Extracts job title, company name, requirements, and recruiter emails from the currently active tab only when you initiate the extraction action.
 - `identity`: Facilitates secure Google OAuth 2.0 authentication for Google Drive and Gmail integrations.
+- **Host Permissions** (`https://generativelanguage.googleapis.com/*`, `https://gmail.googleapis.com/*`, `https://www.googleapis.com/*`): Enables direct, client-to-API communication with Google Gemini for AI analysis, Google Drive for CV importing, and Gmail for draft/email dispatch.
 
 ---
 
-## 5. User Choices & Data Control
+## 5. No Remote Code Execution
+Job Seek Assistant strictly adheres to Manifest V3 security standards. The extension **does not use, fetch, or execute any remote code** (`eval()`, external script tags, or remote CDNs). All logic, dependencies (such as Vue and PDF parsing engines), and assets are packaged and verified locally within the extension bundle.
+
+---
+
+## 6. User Choices & Data Control
 - You can clear all cached data at any time through the **Pengaturan** (Settings) tab in the side panel or by uninstalling the extension.
 - Google OAuth access can be disconnected or revoked at any time directly in the extension or via your Google Account Permissions page.
 
 ---
 
-## 6. Contact & Source Code
+## 7. Contact & Source Code
 Job Seek Assistant is an open-source project. You can inspect the source code, review permissions, or report issues on GitHub:
 - **Repository**: [https://github.com/IlhamFatahillahR27/job-seek-assistant](https://github.com/IlhamFatahillahR27/job-seek-assistant)
