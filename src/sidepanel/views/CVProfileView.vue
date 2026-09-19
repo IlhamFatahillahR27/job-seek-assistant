@@ -155,6 +155,8 @@ const handleSyncCurrentCV = async () => {
       setNotice('CV berhasil diperbarui dengan versi terbaru dari Google Drive!', 'success')
     } else if (result.status === 'up_to_date') {
       setNotice('CV di memori lokal sudah menggunakan versi terbaru (tidak ada perubahan di Drive).', 'info')
+    } else if (result.status === 'not_found') {
+      setNotice('Berkas CV tidak lagi ditemukan di Google Drive (mungkin terhapus atau dipindahkan ke Sampah). Silakan pilih berkas CV lain.', 'error', 8000)
     } else {
       setNotice(result.message, result.status === 'error' ? 'error' : 'info')
     }

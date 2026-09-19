@@ -21,11 +21,13 @@ export class GeminiClientError extends Error {
   public isRateLimit: boolean
   public isAuthError: boolean
   public isModelNotFoundError: boolean
+  public isOfflineError: boolean
 
-  constructor(message: string, status?: number) {
+  constructor(message: string, status?: number, isOffline = false) {
     super(message)
     this.name = 'GeminiClientError'
     this.status = status
+    this.isOfflineError = isOffline
     this.isRateLimit = status === 429
     this.isAuthError = status === 400 || status === 401 || status === 403
     this.isModelNotFoundError =
@@ -78,6 +80,14 @@ SKEMA JSON OUTPUT:
     const trimmedKey = apiKey.trim()
     if (!trimmedKey) {
       throw new GeminiClientError('API Key tidak boleh kosong.', 401)
+    }
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      throw new GeminiClientError(
+        'Koneksi internet terputus (offline). Tidak dapat memuat daftar model Gemini AI.',
+        undefined,
+        true
+      )
     }
 
     const controller = new AbortController()
@@ -160,6 +170,20 @@ SKEMA JSON OUTPUT:
     } catch (err: any) {
       if (err instanceof GeminiClientError) throw err
       const isTimeout = err.name === 'AbortError'
+      const isOffline =
+        (typeof navigator !== 'undefined' && !navigator.onLine) ||
+        err?.name === 'TypeError' ||
+        err?.message?.includes('Failed to fetch') ||
+        err?.message?.includes('NetworkError')
+
+      if (isOffline) {
+        throw new GeminiClientError(
+          'Koneksi internet terputus (offline). Tidak dapat terhubung ke Google Gemini AI.',
+          undefined,
+          true
+        )
+      }
+
       throw new GeminiClientError(
         isTimeout
           ? 'Waktu koneksi habis (timeout) saat memuat daftar model.'
@@ -217,7 +241,9 @@ SKEMA JSON OUTPUT:
       if (err.status === 400 || err.status === 403) {
         msg = 'API Key Gemini tidak valid atau tidak memiliki akses ke Google AI Studio.'
       } else if (err.status === 429) {
-        msg = 'Batas permintaan (Rate Limit) tercapai. Silakan coba lagi sebentar lagi.'
+        msg = 'Batas kuota (Rate Limit 429) tercapai. Silakan coba lagi sebentar lagi.'
+      } else if (err.isOfflineError || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+        msg = 'Koneksi internet terputus (offline). Tidak dapat memvalidasi API Key.'
       }
 
       return {
@@ -292,6 +318,14 @@ SKEMA JSON OUTPUT:
     model: string,
     userPrompt: string
   ): Promise<GeminiRawAnalysisResponse> {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      throw new GeminiClientError(
+        'Koneksi internet terputus (offline). Tidak dapat memanggil Gemini AI tanpa koneksi internet.',
+        undefined,
+        true
+      )
+    }
+
     const cleanModel = model.replace(/^models\//, '')
     const payload = {
       systemInstruction: {
@@ -340,7 +374,7 @@ SKEMA JSON OUTPUT:
 
         if (res.status === 429) {
           throw new GeminiClientError(
-            'Batas kuota Gemini API (Rate Limit 429) tercapai. Silakan tunggu 30-60 detik atau periksa kuota harian di Google AI Studio.',
+            'Batas kuota Gemini API (Rate Limit 429 / RESOURCE_EXHAUSTED) tercapai. Silakan tunggu 30-60 detik, beralih ke model lain di tab Pengaturan, atau gunakan Mode Demo.',
             429
           )
         }
@@ -371,7 +405,21 @@ SKEMA JSON OUTPUT:
       }
       if (err.name === 'AbortError') {
         throw new GeminiClientError(
-          'Permintaan ke Gemini API melebihi batas waktu (timeout). Silakan periksa koneksi internet Anda.'
+          'Permintaan ke Gemini API melebihi batas waktu (timeout). Silakan periksa koneksi internet Anda.',
+          504
+        )
+      }
+      const isOffline =
+        (typeof navigator !== 'undefined' && !navigator.onLine) ||
+        err?.name === 'TypeError' ||
+        err?.message?.includes('Failed to fetch') ||
+        err?.message?.includes('NetworkError')
+
+      if (isOffline) {
+        throw new GeminiClientError(
+          'Koneksi internet terputus (offline). Tidak dapat terhubung ke Google Gemini AI.',
+          undefined,
+          true
         )
       }
       throw new GeminiClientError(err.message || 'Terjadi kesalahan saat memanggil Gemini API.')

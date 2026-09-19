@@ -15,6 +15,22 @@ export interface DownloadedDriveFile {
   content: string | ArrayBuffer
 }
 
+export class GoogleDriveError extends Error {
+  public status?: number
+  public isAuthError: boolean
+  public isNotFoundError: boolean
+  public isOfflineError: boolean
+
+  constructor(message: string, status?: number, isOffline = false) {
+    super(message)
+    this.name = 'GoogleDriveError'
+    this.status = status
+    this.isAuthError = status === 401
+    this.isNotFoundError = status === 404
+    this.isOfflineError = isOffline
+  }
+}
+
 // Demo mock files for offline testing and evaluation without GCP setup
 export const DEMO_DRIVE_FILES: GoogleDriveFileItem[] = [
   {
@@ -80,6 +96,66 @@ SERTIFIKASI & PENGHARGAAN
 - Meta Frontend Developer Professional Certificate (2022)`
 
 export class GoogleDriveService {
+  private static checkOffline(token: string): void {
+    if (token !== 'demo_mock_token_12345' && typeof navigator !== 'undefined' && !navigator.onLine) {
+      throw new GoogleDriveError(
+        'Koneksi internet terputus (offline). Tidak dapat mengakses Google Drive.',
+        undefined,
+        true
+      )
+    }
+  }
+
+  private static handleFetchError(err: any, actionName: string): never {
+    if (err instanceof GoogleDriveError) {
+      throw err
+    }
+    const isOffline =
+      (typeof navigator !== 'undefined' && !navigator.onLine) ||
+      err?.name === 'TypeError' ||
+      err?.message?.includes('Failed to fetch') ||
+      err?.message?.includes('NetworkError')
+
+    if (isOffline) {
+      throw new GoogleDriveError(
+        'Koneksi internet terputus (offline). Tidak dapat mengakses Google Drive.',
+        undefined,
+        true
+      )
+    }
+    throw new GoogleDriveError(err?.message || `Gagal melakukan operasi ${actionName} pada Google Drive.`)
+  }
+
+  private static async handleResponseError(response: Response, actionName: string): Promise<never> {
+    const status = response.status
+    let detail = response.statusText
+    try {
+      const errJson = await response.json()
+      if (errJson?.error?.message) {
+        detail = errJson.error.message
+      }
+    } catch {
+      // ignore
+    }
+
+    if (status === 401) {
+      throw new GoogleDriveError('Sesi Google Drive telah kedaluwarsa. Perlu otentikasi ulang.', 401)
+    }
+    if (status === 404) {
+      throw new GoogleDriveError(
+        'Berkas CV tidak ditemukan di Google Drive (mungkin telah dihapus atau dipindahkan ke Sampah).',
+        404
+      )
+    }
+    if (status === 403) {
+      throw new GoogleDriveError(
+        `Izin akses Google Drive ditolak (${detail}). Pastikan akun Anda memiliki izin membuka berkas ini.`,
+        403
+      )
+    }
+    throw new GoogleDriveError(`Gagal ${actionName} (${status}): ${detail}`, status)
+  }
+
   /**
    * Search files in Google Drive (PDF and Google Docs)
    */
@@ -91,6 +167,8 @@ export class GoogleDriveService {
       }
       return [...DEMO_DRIVE_FILES]
     }
+
+    this.checkOffline(token)
 
     // Build Drive query: non-trashed PDF or Google Docs files
     let q = `trashed = false and (mimeType = 'application/pdf' or mimeType = 'application/vnd.google-apps.document')`
@@ -105,26 +183,29 @@ export class GoogleDriveService {
       q
     )}&orderBy=modifiedTime%20desc&pageSize=25&fields=${encodeURIComponent(fields)}`
 
-    const response = await fetch(endpoint, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
+    try {
+      const response = await fetch(endpoint, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
 
-    if (!response.ok) {
-      const errText = await response.text().catch(() => response.statusText)
-      throw new Error(`Gagal memuat berkas dari Google Drive (${response.status}): ${errText}`)
+      if (!response.ok) {
+        await this.handleResponseError(response, 'memuat berkas dari Google Drive')
+      }
+
+      const data = await response.json()
+      return (data.files || []).map((file: any) => ({
+        id: file.id,
+        name: file.name,
+        mimeType: file.mimeType,
+        modifiedTime: file.modifiedTime,
+        size: file.size,
+        iconLink: file.iconLink,
+      }))
+    } catch (err: any) {
+      this.handleFetchError(err, 'memuat berkas dari Google Drive')
     }
-
-    const data = await response.json()
-    return (data.files || []).map((file: any) => ({
-      id: file.id,
-      name: file.name,
-      mimeType: file.mimeType,
-      modifiedTime: file.modifiedTime,
-      size: file.size,
-      iconLink: file.iconLink,
-    }))
   }
 
   /**
@@ -142,30 +223,36 @@ export class GoogleDriveService {
       }
     }
 
+    this.checkOffline(token)
+
     const fields = 'id, name, mimeType, modifiedTime, size, md5Checksum, iconLink'
     const endpoint = `https://www.googleapis.com/drive/v3/files/${fileId}?fields=${encodeURIComponent(
       fields
     )}`
 
-    const response = await fetch(endpoint, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
+    try {
+      const response = await fetch(endpoint, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
 
-    if (!response.ok) {
-      throw new Error(`Gagal mengambil metadata berkas (${response.status}): ${response.statusText}`)
-    }
+      if (!response.ok) {
+        await this.handleResponseError(response, 'mengambil metadata berkas')
+      }
 
-    const data = await response.json()
-    return {
-      id: data.id,
-      name: data.name,
-      mimeType: data.mimeType,
-      modifiedTime: data.modifiedTime,
-      size: data.size,
-      iconLink: data.iconLink,
-      md5Checksum: data.md5Checksum,
+      const data = await response.json()
+      return {
+        id: data.id,
+        name: data.name,
+        mimeType: data.mimeType,
+        modifiedTime: data.modifiedTime,
+        size: data.size,
+        iconLink: data.iconLink,
+        md5Checksum: data.md5Checksum,
+      }
+    } catch (err: any) {
+      this.handleFetchError(err, 'mengambil metadata berkas')
     }
   }
 
@@ -192,50 +279,60 @@ export class GoogleDriveService {
       }
     }
 
+    this.checkOffline(token)
+
     // Google Docs -> Export as text/plain
     if (mimeType === 'application/vnd.google-apps.document') {
       const exportUrl = `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=text/plain`
-      const response = await fetch(exportUrl, {
+      try {
+        const response = await fetch(exportUrl, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+
+        if (!response.ok) {
+          await this.handleResponseError(response, 'mengeksport Google Doc')
+        }
+
+        const text = await response.text()
+        return {
+          fileId,
+          fileName: meta.name || fileName,
+          mimeType,
+          modifiedTime: meta.modifiedTime,
+          checksum: meta.md5Checksum,
+          content: text,
+        }
+      } catch (err: any) {
+        this.handleFetchError(err, 'mengeksport Google Doc')
+      }
+    }
+
+    // Binary file (PDF) -> Download alt=media as ArrayBuffer
+    const downloadUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`
+    try {
+      const response = await fetch(downloadUrl, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       })
 
       if (!response.ok) {
-        throw new Error(`Gagal mengekspor Google Doc (${response.status}): ${response.statusText}`)
+        await this.handleResponseError(response, 'mengunduh berkas PDF')
       }
 
-      const text = await response.text()
+      const arrayBuffer = await response.arrayBuffer()
       return {
         fileId,
         fileName: meta.name || fileName,
         mimeType,
         modifiedTime: meta.modifiedTime,
         checksum: meta.md5Checksum,
-        content: text,
+        content: arrayBuffer,
       }
-    }
-
-    // Binary file (PDF) -> Download alt=media as ArrayBuffer
-    const downloadUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`
-    const response = await fetch(downloadUrl, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-
-    if (!response.ok) {
-      throw new Error(`Gagal mengunduh berkas PDF (${response.status}): ${response.statusText}`)
-    }
-
-    const arrayBuffer = await response.arrayBuffer()
-    return {
-      fileId,
-      fileName: meta.name || fileName,
-      mimeType,
-      modifiedTime: meta.modifiedTime,
-      checksum: meta.md5Checksum,
-      content: arrayBuffer,
+    } catch (err: any) {
+      this.handleFetchError(err, 'mengunduh berkas PDF')
     }
   }
 
@@ -267,19 +364,43 @@ export class GoogleDriveService {
       }
     }
 
+    this.checkOffline(token)
+
     // If Google Docs, export directly to application/pdf
     if (mimeType === 'application/vnd.google-apps.document') {
       const exportUrl = `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=application/pdf`
-      const response = await fetch(exportUrl, {
+      try {
+        const response = await fetch(exportUrl, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+
+        if (!response.ok) {
+          await this.handleResponseError(response, 'mengeksport Google Doc ke PDF')
+        }
+
+        const buffer = await response.arrayBuffer()
+        return {
+          fileName: pdfFileName,
+          content: buffer,
+        }
+      } catch (err: any) {
+        this.handleFetchError(err, 'mengeksport Google Doc ke PDF')
+      }
+    }
+
+    // Default binary file download (e.g. PDF)
+    const downloadUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`
+    try {
+      const response = await fetch(downloadUrl, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       })
 
       if (!response.ok) {
-        throw new Error(
-          `Gagal mengekspor Google Doc ke PDF (${response.status}): ${response.statusText}`
-        )
+        await this.handleResponseError(response, 'mengunduh berkas PDF')
       }
 
       const buffer = await response.arrayBuffer()
@@ -287,24 +408,8 @@ export class GoogleDriveService {
         fileName: pdfFileName,
         content: buffer,
       }
-    }
-
-    // Default binary file download (e.g. PDF)
-    const downloadUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`
-    const response = await fetch(downloadUrl, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-
-    if (!response.ok) {
-      throw new Error(`Gagal mengunduh berkas PDF (${response.status}): ${response.statusText}`)
-    }
-
-    const buffer = await response.arrayBuffer()
-    return {
-      fileName: pdfFileName,
-      content: buffer,
+    } catch (err: any) {
+      this.handleFetchError(err, 'mengunduh berkas PDF')
     }
   }
 }

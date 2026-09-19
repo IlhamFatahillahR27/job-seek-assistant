@@ -10,11 +10,13 @@ export class GmailClientError extends Error {
   public status?: number
   public isAuthError: boolean
   public isScopeError: boolean
+  public isOfflineError: boolean
 
-  constructor(message: string, status?: number) {
+  constructor(message: string, status?: number, isOffline = false) {
     super(message)
     this.name = 'GmailClientError'
     this.status = status
+    this.isOfflineError = isOffline
     this.isAuthError = status === 401
     this.isScopeError = status === 403
   }
@@ -47,6 +49,14 @@ export class GmailClientService {
       }
     }
 
+    if (token !== 'demo_mock_token_12345' && typeof navigator !== 'undefined' && !navigator.onLine) {
+      throw new GmailClientError(
+        'Koneksi internet terputus (offline). Tidak dapat menyimpan draf ke Gmail tanpa koneksi internet.',
+        undefined,
+        true
+      )
+    }
+
     const endpoint = `${GMAIL_API_BASE}/drafts`
     const payload = {
       message: {
@@ -76,6 +86,19 @@ export class GmailClientService {
       }
     } catch (err: any) {
       if (err instanceof GmailClientError) throw err
+      const isOffline =
+        (typeof navigator !== 'undefined' && !navigator.onLine) ||
+        err?.name === 'TypeError' ||
+        err?.message?.includes('Failed to fetch') ||
+        err?.message?.includes('NetworkError')
+
+      if (isOffline) {
+        throw new GmailClientError(
+          'Koneksi internet terputus (offline). Gagal menghubungi server Gmail.',
+          undefined,
+          true
+        )
+      }
       throw new GmailClientError(err.message || 'Gagal menyimpan draf ke Gmail.')
     }
   }
@@ -93,6 +116,14 @@ export class GmailClientService {
         messageId: `demo_sent_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         threadId: `demo_thread_${Date.now()}`,
       }
+    }
+
+    if (token !== 'demo_mock_token_12345' && typeof navigator !== 'undefined' && !navigator.onLine) {
+      throw new GmailClientError(
+        'Koneksi internet terputus (offline). Tidak dapat mengirim email langsung tanpa koneksi internet.',
+        undefined,
+        true
+      )
     }
 
     const endpoint = `${GMAIL_API_BASE}/messages/send`
@@ -122,6 +153,19 @@ export class GmailClientService {
       }
     } catch (err: any) {
       if (err instanceof GmailClientError) throw err
+      const isOffline =
+        (typeof navigator !== 'undefined' && !navigator.onLine) ||
+        err?.name === 'TypeError' ||
+        err?.message?.includes('Failed to fetch') ||
+        err?.message?.includes('NetworkError')
+
+      if (isOffline) {
+        throw new GmailClientError(
+          'Koneksi internet terputus (offline). Gagal menghubungi server Gmail.',
+          undefined,
+          true
+        )
+      }
       throw new GmailClientError(err.message || 'Gagal mengirim email via Gmail.')
     }
   }

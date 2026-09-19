@@ -178,7 +178,13 @@ export function useEmailGenerator() {
 
       return generated
     } catch (err: any) {
-      generalErrorState.value = err.message || 'Gagal membuat template email lamaran.'
+      let msg = err.message || 'Gagal membuat template email lamaran.'
+      if (err?.status === 429 || err?.message?.includes('429') || err?.message?.includes('kuota')) {
+        msg = 'Batas kuota Gemini API (Rate Limit 429) tercapai. Silakan tunggu 30-60 detik, pilih model lain di tab Pengaturan, atau gunakan Mode Demo.'
+      } else if (err?.isOfflineError || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+        msg = 'Koneksi internet terputus (offline). Tidak dapat membuat template email tanpa internet.'
+      }
+      generalErrorState.value = msg
       throw err
     } finally {
       isGeneratingState.value = false
@@ -227,7 +233,13 @@ export function useEmailGenerator() {
       changesSummaryState.value = result.changesSummary
       refinementFeedbackState.value = ''
     } catch (err: any) {
-      generalErrorState.value = err.message || 'Gagal merevisi email.'
+      let msg = err.message || 'Gagal merevisi email.'
+      if (err?.status === 429 || err?.message?.includes('429') || err?.message?.includes('kuota')) {
+        msg = 'Batas kuota Gemini API tercapai saat merevisi email. Silakan tunggu sebentar atau coba lagi nanti.'
+      } else if (err?.isOfflineError || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+        msg = 'Koneksi internet terputus (offline). Tidak dapat merevisi email tanpa koneksi internet.'
+      }
+      generalErrorState.value = msg
       throw err
     } finally {
       isRefiningState.value = false

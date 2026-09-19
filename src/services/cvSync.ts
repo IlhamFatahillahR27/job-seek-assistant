@@ -5,7 +5,7 @@
  */
 
 import { storageService, STORAGE_KEYS } from './storage'
-import { GoogleDriveService } from './googleDrive'
+import { GoogleDriveService, GoogleDriveError } from './googleDrive'
 import { CVParserService } from './cvParser'
 import type { CVProfile, CVSyncResult } from '@/types/cv'
 
@@ -56,6 +56,30 @@ export class CVSyncService {
       }
     } catch (error: any) {
       console.error('[CVSyncService] Error checking Drive update:', error)
+      const isNotFound =
+        (error instanceof GoogleDriveError && error.isNotFoundError) ||
+        error?.status === 404 ||
+        error?.message?.includes('tidak ditemukan') ||
+        error?.message?.includes('404')
+
+      if (isNotFound) {
+        return {
+          hasUpdate: false,
+          message: 'Berkas CV tidak ditemukan di Google Drive (mungkin telah dihapus atau dipindahkan ke Sampah). Silakan pilih berkas CV baru.',
+        }
+      }
+
+      const isOffline =
+        (error instanceof GoogleDriveError && error.isOfflineError) ||
+        (typeof navigator !== 'undefined' && !navigator.onLine)
+
+      if (isOffline) {
+        return {
+          hasUpdate: false,
+          message: 'Perangkat sedang offline. Tidak dapat memeriksa pembaruan CV dari Google Drive tanpa koneksi internet.',
+        }
+      }
+
       return {
         hasUpdate: false,
         message: `Gagal memeriksa pembaruan: ${error.message || 'Terjadi kesalahan jaringan'}`,
@@ -120,6 +144,30 @@ export class CVSyncService {
       }
     } catch (error: any) {
       console.error('[CVSyncService] Error syncing with Drive:', error)
+      const isNotFound =
+        (error instanceof GoogleDriveError && error.isNotFoundError) ||
+        error?.status === 404 ||
+        error?.message?.includes('tidak ditemukan') ||
+        error?.message?.includes('404')
+
+      if (isNotFound) {
+        return {
+          status: 'not_found',
+          message: 'Berkas CV tidak ditemukan di Google Drive (mungkin telah dihapus atau dipindahkan ke Sampah). Silakan pilih berkas CV lain di tab Profil & CV.',
+        }
+      }
+
+      const isOffline =
+        (error instanceof GoogleDriveError && error.isOfflineError) ||
+        (typeof navigator !== 'undefined' && !navigator.onLine)
+
+      if (isOffline) {
+        return {
+          status: 'error',
+          message: 'Perangkat sedang offline. Tidak dapat menyinkronkan CV dari Google Drive tanpa koneksi internet.',
+        }
+      }
+
       return {
         status: 'error',
         message: `Gagal memperbarui CV: ${error.message || 'Kesalahan saat mengunduh/memproses berkas'}`,

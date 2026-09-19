@@ -2,7 +2,7 @@
 // Configures extension behavior and handles cross-context messages
 
 import { GoogleAuthService } from '@/services/googleAuth'
-import { GoogleDriveService } from '@/services/googleDrive'
+import { GoogleDriveService, GoogleDriveError } from '@/services/googleDrive'
 import { CVParserService } from '@/services/cvParser'
 import { CVSyncService } from '@/services/cvSync'
 import { MimeBuilderService, type MimeAttachment } from '@/services/mimeBuilder'
@@ -25,6 +25,46 @@ chrome.runtime.onInstalled.addListener(async () => {
     }
   }
 })
+
+async function withTokenRefresh<T>(
+  action: (token: string) => Promise<T>,
+  contextDesc = 'operasi Google Workspace'
+): Promise<T> {
+  let token = await GoogleAuthService.getValidToken(false)
+  if (!token) {
+    throw new Error('Google Workspace belum terhubung. Silakan hubungkan akun Google di tab Pengaturan.')
+  }
+
+  try {
+    return await action(token)
+  } catch (err: any) {
+    const isAuthError =
+      (err instanceof GoogleDriveError && err.isAuthError) ||
+      (err instanceof GmailClientError && err.isAuthError) ||
+      err?.status === 401 ||
+      err?.message?.includes('401') ||
+      err?.message?.includes('kedaluwarsa')
+
+    if (isAuthError && token !== 'demo_mock_token_12345') {
+      console.warn(`[Background] 401 Auth Error during ${contextDesc}. Attempting silent token refresh...`)
+      await GoogleAuthService.invalidateToken(token)
+      const freshToken = await GoogleAuthService.getValidToken(false)
+      if (freshToken) {
+        console.info(`[Background] Token refreshed successfully. Retrying ${contextDesc}...`)
+        return await action(freshToken)
+      } else {
+        // Mark status as disconnected
+        const settings = await storageService.get<any>(STORAGE_KEYS.SETTINGS, {})
+        await storageService.set(STORAGE_KEYS.SETTINGS, {
+          ...settings,
+          googleAuthStatus: 'disconnected',
+        })
+        throw new Error('Sesi Google Workspace telah berakhir. Silakan klik tombol "Hubungkan Akun Google" di tab Pengaturan.')
+      }
+    }
+    throw err
+  }
+}
 
 // Listen for cross-context messages from Side Panel, Popup, or Content Script
 chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendResponse) => {
@@ -59,11 +99,10 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendRe
         }
 
         case 'DRIVE_LIST_FILES_REQUEST': {
-          const token = await GoogleAuthService.getValidToken(false)
-          if (!token) {
-            throw new Error('Google Workspace belum terhubung. Silakan login terlebih dahulu.')
-          }
-          const files = await GoogleDriveService.listFiles(token, message.payload?.query)
+          const files = await withTokenRefresh(
+            (t) => GoogleDriveService.listFiles(t, message.payload?.query),
+            'memuat berkas Google Drive'
+          )
           return {
             type: 'DRIVE_LIST_FILES_SUCCESS',
             payload: files,
@@ -71,13 +110,11 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendRe
         }
 
         case 'DRIVE_FETCH_CV_REQUEST': {
-          const token = await GoogleAuthService.getValidToken(false)
-          if (!token) {
-            throw new Error('Google Workspace belum terhubung.')
-          }
-
           const { fileId, fileName, mimeType } = message.payload
-          const downloaded = await GoogleDriveService.downloadFileContent(token, fileId, mimeType, fileName)
+          const downloaded = await withTokenRefresh(
+            (t) => GoogleDriveService.downloadFileContent(t, fileId, mimeType, fileName),
+            'mengunduh berkas CV Google Drive'
+          )
 
           let rawText = ''
           if (typeof downloaded.content === 'string') {
@@ -104,17 +141,15 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendRe
         }
 
         case 'SYNC_CV_REQUEST': {
-          const token = await GoogleAuthService.getValidToken(false)
-          if (!token) {
-            throw new Error('Google Workspace belum terhubung.')
-          }
-
           const currentProfile = await storageService.get<CVProfile | null>(STORAGE_KEYS.CV_PROFILE, null)
           if (!currentProfile) {
             throw new Error('Tidak ada CV yang tersimpan untuk disinkronkan.')
           }
 
-          const syncResult = await CVSyncService.syncWithDrive(token, currentProfile)
+          const syncResult = await withTokenRefresh(
+            (t) => CVSyncService.syncWithDrive(t, currentProfile),
+            'sinkronisasi CV Google Drive'
+          )
           return {
             type: 'SYNC_CV_SUCCESS',
             payload: syncResult,
@@ -145,71 +180,48 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendRe
             throw new Error('Isi email tidak boleh kosong.')
           }
 
-          let token = await GoogleAuthService.getValidToken(false)
-          if (!token) {
-            throw new Error('Google Workspace belum terhubung. Silakan hubungkan akun Google Anda di tab Pengaturan.')
-          }
-
-          let attachment: MimeAttachment | undefined
-          if (payload.attachmentFileId) {
-            try {
-              const downloadedPdf = await GoogleDriveService.downloadFileAsPdf(
-                token,
-                payload.attachmentFileId,
-                payload.attachmentMimeType,
-                payload.attachmentFileName || 'CV_Resume.pdf'
-              )
-              attachment = {
-                filename: downloadedPdf.fileName,
-                mimeType: 'application/pdf',
-                data: downloadedPdf.content,
+          const dispatchResult = await withTokenRefresh(async (activeToken) => {
+            let attachment: MimeAttachment | undefined
+            if (payload.attachmentFileId) {
+              try {
+                const downloadedPdf = await GoogleDriveService.downloadFileAsPdf(
+                  activeToken,
+                  payload.attachmentFileId,
+                  payload.attachmentMimeType,
+                  payload.attachmentFileName || 'CV_Resume.pdf'
+                )
+                attachment = {
+                  filename: downloadedPdf.fileName,
+                  mimeType: 'application/pdf',
+                  data: downloadedPdf.content,
+                }
+              } catch (attachErr: any) {
+                console.warn('[Background] Failed to download PDF attachment:', attachErr)
+                throw new Error(`Gagal melampirkan berkas CV dari Google Drive: ${attachErr.message}`)
               }
-            } catch (attachErr: any) {
-              console.warn('[Background] Failed to download PDF attachment:', attachErr)
-              throw new Error(`Gagal melampirkan berkas CV dari Google Drive: ${attachErr.message}`)
             }
-          }
 
-          const rawBase64Url = MimeBuilderService.buildRfc2822Base64Url({
-            to: payload.recipientEmail,
-            subject: payload.subject,
-            body: payload.body,
-            attachment,
-          })
+            const rawBase64Url = MimeBuilderService.buildRfc2822Base64Url({
+              to: payload.recipientEmail,
+              subject: payload.subject,
+              body: payload.body,
+              attachment,
+            })
 
-          const executeDispatch = async (activeToken: string) => {
+            let res: any
             if (payload.action === 'draft') {
-              return await GmailClientService.createDraft(activeToken, rawBase64Url)
+              res = await GmailClientService.createDraft(activeToken, rawBase64Url)
             } else {
-              return await GmailClientService.sendMessage(activeToken, rawBase64Url)
+              res = await GmailClientService.sendMessage(activeToken, rawBase64Url)
             }
-          }
-
-          let dispatchResult: any
-          try {
-            dispatchResult = await executeDispatch(token)
-          } catch (err: any) {
-            // Auto-refresh token retry on 401
-            if (err instanceof GmailClientError && err.isAuthError) {
-              console.warn('[Background] 401 received, invalidating token and retrying...')
-              await GoogleAuthService.invalidateToken(token)
-              const freshToken = await GoogleAuthService.getValidToken(false)
-              if (freshToken) {
-                token = freshToken
-                dispatchResult = await executeDispatch(freshToken)
-              } else {
-                throw err
-              }
-            } else {
-              throw err
-            }
-          }
+            return { res, attachment }
+          }, 'pengiriman Gmail')
 
           const successResult: EmailDispatchResult = {
             success: true,
             action: payload.action,
-            draftId: dispatchResult.draftId,
-            messageId: dispatchResult.messageId,
+            draftId: dispatchResult.res.draftId,
+            messageId: dispatchResult.res.messageId,
             dispatchedAt: new Date().toISOString(),
           }
 
@@ -225,10 +237,10 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendRe
               subject: payload.subject,
               action: payload.action,
               status: 'success',
-              draftId: dispatchResult.draftId,
-              messageId: dispatchResult.messageId,
-              attachmentIncluded: !!attachment,
-              attachmentName: attachment?.filename,
+              draftId: dispatchResult.res.draftId,
+              messageId: dispatchResult.res.messageId,
+              attachmentIncluded: !!dispatchResult.attachment,
+              attachmentName: dispatchResult.attachment?.filename,
               dispatchedAt: successResult.dispatchedAt,
             }
             await storageService.set(STORAGE_KEYS.EMAIL_DRAFTS, [historyItem, ...history].slice(0, 15))

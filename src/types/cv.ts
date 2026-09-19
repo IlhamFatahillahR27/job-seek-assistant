@@ -36,7 +36,7 @@ export interface GoogleDriveFileItem {
   iconLink?: string
 }
 
-export type CVSyncStatus = 'up_to_date' | 'updated' | 'not_drive' | 'error'
+export type CVSyncStatus = 'up_to_date' | 'updated' | 'not_drive' | 'error' | 'not_found'
 
 export interface CVSyncResult {
   status: CVSyncStatus

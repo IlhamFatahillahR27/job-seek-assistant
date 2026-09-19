@@ -102,27 +102,43 @@ export class GoogleAuthService {
       }
     }
 
-    const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        // Token might have expired, invalidate cached token
-        await this.invalidateToken(token)
-        throw new Error('Sesi Google telah kedaluwarsa. Silakan hubungkan ulang akun Anda.')
-      }
-      throw new Error(`Gagal mengambil profil pengguna: ${response.statusText}`)
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      throw new Error('Koneksi offline: Tidak dapat memverifikasi profil Google saat terputus dari internet.')
     }
 
-    const data = await response.json()
-    return {
-      id: data.id,
-      email: data.email,
-      name: data.name || data.email,
-      picture: data.picture,
+    try {
+      const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          // Token might have expired, invalidate cached token
+          await this.invalidateToken(token)
+          throw new Error('Sesi Google telah kedaluwarsa. Silakan hubungkan ulang akun Anda.')
+        }
+        throw new Error(`Gagal mengambil profil pengguna: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      return {
+        id: data.id,
+        email: data.email,
+        name: data.name || data.email,
+        picture: data.picture,
+      }
+    } catch (err: any) {
+      if (
+        (typeof navigator !== 'undefined' && !navigator.onLine) ||
+        err?.name === 'TypeError' ||
+        err?.message?.includes('Failed to fetch') ||
+        err?.message?.includes('NetworkError')
+      ) {
+        throw new Error('Koneksi internet terputus (offline). Gagal menghubungkan profil Google.')
+      }
+      throw err
     }
   }
 
