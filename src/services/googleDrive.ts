@@ -173,12 +173,12 @@ export class GoogleDriveService {
     // Build Drive query: non-trashed PDF or Google Docs files
     let q = `trashed = false and (mimeType = 'application/pdf' or mimeType = 'application/vnd.google-apps.document')`
     if (searchKeyword && searchKeyword.trim()) {
-      // Escape single quotes for Drive search
-      const sanitized = searchKeyword.replace(/'/g, "\\'")
+      // Escape backslashes and single quotes for Drive search
+      const sanitized = searchKeyword.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
       q += ` and name contains '${sanitized}'`
     }
 
-    const fields = 'files(id, name, mimeType, modifiedTime, size, iconLink)'
+    const fields = 'files(id, name, mimeType, modifiedTime, size, iconLink, webViewLink)'
     const endpoint = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
       q
     )}&orderBy=modifiedTime%20desc&pageSize=25&fields=${encodeURIComponent(fields)}`
@@ -202,6 +202,7 @@ export class GoogleDriveService {
         modifiedTime: file.modifiedTime,
         size: file.size,
         iconLink: file.iconLink,
+        webViewLink: file.webViewLink || `https://drive.google.com/file/d/${file.id}/view`,
       }))
     } catch (err: any) {
       this.handleFetchError(err, 'memuat berkas dari Google Drive')
@@ -219,13 +220,14 @@ export class GoogleDriveService {
       const found = DEMO_DRIVE_FILES.find((f) => f.id === fileId) || DEMO_DRIVE_FILES[0]
       return {
         ...found,
+        webViewLink: `https://drive.google.com/file/d/${found.id}/view`,
         md5Checksum: 'demo_checksum_hash_123',
       }
     }
 
     this.checkOffline(token)
 
-    const fields = 'id, name, mimeType, modifiedTime, size, md5Checksum, iconLink'
+    const fields = 'id, name, mimeType, modifiedTime, size, md5Checksum, iconLink, webViewLink'
     const endpoint = `https://www.googleapis.com/drive/v3/files/${fileId}?fields=${encodeURIComponent(
       fields
     )}`
@@ -249,6 +251,7 @@ export class GoogleDriveService {
         modifiedTime: data.modifiedTime,
         size: data.size,
         iconLink: data.iconLink,
+        webViewLink: data.webViewLink || `https://drive.google.com/file/d/${data.id}/view`,
         md5Checksum: data.md5Checksum,
       }
     } catch (err: any) {
@@ -381,6 +384,13 @@ export class GoogleDriveService {
         }
 
         const buffer = await response.arrayBuffer()
+        const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024 // 10 MB
+        if (buffer.byteLength > MAX_ATTACHMENT_BYTES) {
+          throw new GoogleDriveError(
+            `Ukuran berkas "${pdfFileName}" (${(buffer.byteLength / (1024 * 1024)).toFixed(1)} MB) melebihi batas aman lampiran fisik (10 MB). Silakan sisipkan tautan Google Drive pada isi email.`,
+            413
+          )
+        }
         return {
           fileName: pdfFileName,
           content: buffer,
@@ -404,6 +414,13 @@ export class GoogleDriveService {
       }
 
       const buffer = await response.arrayBuffer()
+      const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024 // 10 MB
+      if (buffer.byteLength > MAX_ATTACHMENT_BYTES) {
+        throw new GoogleDriveError(
+          `Ukuran berkas "${pdfFileName}" (${(buffer.byteLength / (1024 * 1024)).toFixed(1)} MB) melebihi batas aman lampiran fisik (10 MB). Silakan sisipkan tautan Google Drive pada isi email.`,
+          413
+        )
+      }
       return {
         fileName: pdfFileName,
         content: buffer,

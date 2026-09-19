@@ -66,11 +66,37 @@ async function withTokenRefresh<T>(
   }
 }
 
+function isPrivilegedSender(sender: chrome.runtime.MessageSender): boolean {
+  // Sender must match extension's own ID
+  if (sender.id && chrome.runtime?.id && sender.id !== chrome.runtime.id) {
+    return false
+  }
+  // Content scripts running inside web pages have sender.tab defined.
+  // Internal UI (Sidepanel, Popup) do not have sender.tab and have chrome-extension:// origin.
+  if (sender.tab) {
+    return false
+  }
+  return true
+}
+
 // Listen for cross-context messages from Side Panel, Popup, or Content Script
-chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendResponse) => {
   // Handle async response by returning true
   const handleMessage = async () => {
     try {
+      const privilegedMessageTypes = [
+        'GOOGLE_AUTH_REQUEST',
+        'GOOGLE_LOGOUT_REQUEST',
+        'DRIVE_LIST_FILES_REQUEST',
+        'DRIVE_FETCH_CV_REQUEST',
+        'SYNC_CV_REQUEST',
+        'SEND_GMAIL_REQUEST',
+      ]
+
+      if (privilegedMessageTypes.includes(message.type) && !isPrivilegedSender(sender)) {
+        throw new Error('Akses ditolak: Operasi istimewa ini hanya dapat dipanggil dari antarmuka internal ekstensi.')
+      }
+
       switch (message.type) {
         case 'GOOGLE_AUTH_REQUEST': {
           const authResult = await GoogleAuthService.login(message.payload?.customClientId)
@@ -170,8 +196,15 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendRe
 
         case 'SEND_GMAIL_REQUEST': {
           const payload = message.payload
-          if (!payload.recipientEmail?.trim()) {
+          const recipientClean = payload.recipientEmail?.trim()
+          if (!recipientClean) {
             throw new Error('Alamat email penerima tidak boleh kosong.')
+          }
+          if (/[\r\n]/.test(recipientClean) || /[\r\n]/.test(payload.subject || '')) {
+            throw new Error('Format email atau subjek tidak valid (karakter baris baru tidak diizinkan).')
+          }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientClean)) {
+            throw new Error('Format alamat email penerima tidak valid.')
           }
           if (!payload.subject?.trim()) {
             throw new Error('Subjek email tidak boleh kosong.')

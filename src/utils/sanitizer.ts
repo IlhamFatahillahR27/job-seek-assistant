@@ -48,6 +48,11 @@ export function cleanDomElement(element: Element): void {
     'footer',
     'header',
     'aside',
+    'button',
+    'input',
+    'select',
+    'textarea',
+    'form',
   ]
 
   tagsToRemove.forEach((tag) => {
@@ -158,6 +163,10 @@ export function sanitizePromptInjection(text: string): string {
   let sanitized = text
     .replace(/<\/?job_posting[^>]*>/gi, '[job_posting_tag]')
     .replace(/<\/?candidate_cv[^>]*>/gi, '[candidate_cv_tag]')
+    .replace(/<\/?user_feedback[^>]*>/gi, '[user_feedback_tag]')
+    .replace(/<\/?current_draft[^>]*>/gi, '[current_draft_tag]')
+    .replace(/<\/?target_language[^>]*>/gi, '[target_language_tag]')
+    .replace(/<\/?system_instruction[^>]*>/gi, '[system_instruction_tag]')
 
   // 2. Neutralize instruction injection phrases
   for (const pattern of PROMPT_INJECTION_PATTERNS) {
@@ -173,10 +182,18 @@ export function sanitizePromptInjection(text: string): string {
 export function extractEmailsFromText(text: string): string[] {
   if (!text) return []
 
-  const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g
+  // Validated email regex without literal pipe character in character class
+  const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g
   const matches = text.match(emailRegex) || []
 
-  const unique = Array.from(new Set(matches.map((e) => e.toLowerCase().trim())))
+  const cleanedMatches = matches
+    .map((raw) => {
+      // Strip trailing punctuation like commas, periods, closing parens/brackets
+      return raw.replace(/[.,;:!?)\]}]+$/g, '').toLowerCase().trim()
+    })
+    .filter((e) => e.length > 5 && e.includes('@') && e.includes('.'))
+
+  const unique = Array.from(new Set(cleanedMatches))
 
   return unique.filter((email) => {
     // Avoid common file extension false positives

@@ -34,6 +34,7 @@ export interface GoogleDriveFileItem {
   modifiedTime?: string
   size?: string
   iconLink?: string
+  webViewLink?: string
 }
 
 export type CVSyncStatus = 'up_to_date' | 'updated' | 'not_drive' | 'error' | 'not_found'
@@ -64,4 +65,5 @@ export interface CVProfile {
   experiences: CVExperience[]
   educations: CVEducation[]
   certifications?: string[]
+  webViewLink?: string
 }

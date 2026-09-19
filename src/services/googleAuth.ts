@@ -226,11 +226,12 @@ export class GoogleAuthService {
     const scopes = encodeURIComponent(
       'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/gmail.compose https://www.googleapis.com/auth/gmail.send'
     )
+    const stateToken = Math.random().toString(36).substring(2) + Date.now().toString(36)
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(
       clientId
     )}&response_type=token&redirect_uri=${encodeURIComponent(
       redirectUrl
-    )}&scope=${scopes}&prompt=consent`
+    )}&scope=${scopes}&state=${encodeURIComponent(stateToken)}&prompt=consent`
 
     return new Promise((resolve, reject) => {
       chrome.identity.launchWebAuthFlow(
@@ -253,6 +254,11 @@ export class GoogleAuthService {
             const hashParams = new URLSearchParams(url.hash.substring(1))
             const accessToken = hashParams.get('access_token')
             const expiresIn = hashParams.get('expires_in')
+            const returnedState = hashParams.get('state')
+
+            if (returnedState && returnedState !== stateToken) {
+              return reject(new Error('Validasi OAuth gagal (state parameter tidak cocok).'))
+            }
 
             if (!accessToken) {
               const errorDesc = hashParams.get('error_description') || hashParams.get('error')
@@ -276,7 +282,7 @@ export class GoogleAuthService {
   }
 
   /**
-   * Invalidate/remove cached token locally and remotely
+   * Invalidate/remove cached token locally, in storage, and remotely
    */
   static async invalidateToken(token: string): Promise<void> {
     if (this.isIdentityAvailable() && token && token !== 'demo_mock_token_12345') {
@@ -289,6 +295,23 @@ export class GoogleAuthService {
       }
     }
     this.cachedToken = null
+
+    // Clear stored custom access token to prevent 401 loop
+    try {
+      const settings = await storageService.get<AppSettings>(
+        STORAGE_KEYS.SETTINGS,
+        {} as AppSettings
+      )
+      if (settings.googleAccessToken === token || !token) {
+        await storageService.set(STORAGE_KEYS.SETTINGS, {
+          ...settings,
+          googleAccessToken: '',
+          googleTokenExpiresAt: 0,
+        })
+      }
+    } catch (err) {
+      console.warn('[GoogleAuthService] Failed to clear token from storage:', err)
+    }
   }
 
   /**

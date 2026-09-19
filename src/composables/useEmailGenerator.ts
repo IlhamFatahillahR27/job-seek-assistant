@@ -61,15 +61,27 @@ export function useEmailGenerator() {
     )
   })
 
-  // Auto-sync recipient email if currentJob has recruiterEmail and user hasn't typed one
+  // Track current job ID to reset or update recipient email cleanly when job changes
+  let lastTrackedJobId = currentJob.value?.id
+
   watch(
-    () => currentJob.value?.recruiterEmail,
-    (newEmail) => {
-      if (newEmail && (!recipientEmailState.value || recipientEmailState.value === 'recruiter@company.com')) {
-        recipientEmailState.value = newEmail
+    () => currentJob.value,
+    (newJob) => {
+      if (!newJob) {
+        recipientEmailState.value = ''
+        lastTrackedJobId = undefined
+        return
+      }
+
+      // If switching to a different job, update recipient email to new job's recruiter email (or clear if none)
+      if (newJob.id !== lastTrackedJobId) {
+        lastTrackedJobId = newJob.id
+        recipientEmailState.value = newJob.recruiterEmail?.trim() || ''
+      } else if (newJob.recruiterEmail && !recipientEmailState.value) {
+        recipientEmailState.value = newJob.recruiterEmail.trim()
       }
     },
-    { immediate: true }
+    { immediate: true, deep: true }
   )
 
   const loadHistory = async () => {
@@ -331,6 +343,18 @@ export function useEmailGenerator() {
     selectTone(activeToneState.value)
   }
 
+  /**
+   * Insert Google Drive shareable link into email body text
+   */
+  const insertDriveLink = (customUrl?: string) => {
+    const link = customUrl || cvProfile.value?.webViewLink || (cvProfile.value?.fileId ? `https://drive.google.com/file/d/${cvProfile.value.fileId}/view` : '')
+    if (!link) return
+    const linkText = `\n\nTautan CV (Google Drive): ${link}`
+    if (!bodyState.value.includes(link)) {
+      bodyState.value = `${bodyState.value.trim()}${linkText}`
+    }
+  }
+
   return {
     templates: templatesState,
     activeTone: activeToneState,
@@ -356,6 +380,7 @@ export function useEmailGenerator() {
     saveDraft,
     sendDirectly,
     resetDraft,
+    insertDriveLink,
     loadHistory,
     initEmailState,
   }

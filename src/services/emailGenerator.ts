@@ -153,6 +153,17 @@ SKEMA JSON OUTPUT:
     }
 
     const model = (options.model || DEFAULT_MODEL).replace(/^models\//, '').trim() || DEFAULT_MODEL
+    const safeCv = (cvText || '')
+      .replace(/<\/?candidate_cv[^>]*>/gi, '[candidate_cv]')
+      .replace(/<\/?job_posting[^>]*>/gi, '[job_posting]')
+      .trim()
+    const safeDesc = (job.description || '')
+      .replace(/<\/?job_posting[^>]*>/gi, '[job_posting]')
+      .trim()
+    const safeReq = (job.requirements || '')
+      .replace(/<\/?job_posting[^>]*>/gi, '[job_posting]')
+      .trim()
+
     const userPrompt = `Buatlah 3 template email lamaran kerja berdasarkan data berikut:
 
 <target_language>
@@ -160,7 +171,7 @@ ${resolvedLang === 'id' ? 'Bahasa Indonesia (id)' : 'English (en)'}
 </target_language>
 
 <candidate_cv>
-${cvText.trim()}
+${safeCv}
 </candidate_cv>
 
 <job_posting>
@@ -169,10 +180,10 @@ Nama Perusahaan: ${job.company || 'Tidak ditentukan'}
 Lokasi: ${job.location || 'Tidak ditentukan'}
 
 Deskripsi Pekerjaan:
-${job.description || 'Tidak ada deskripsi'}
+${safeDesc || 'Tidak ada deskripsi'}
 
 Persyaratan:
-${job.requirements || 'Lihat deskripsi'}
+${safeReq || 'Lihat deskripsi'}
 </job_posting>
 
 Berikan 3 opsi gaya (formal, impact_focused, concise_pitch) dalam format JSON valid sesuai skema.`
@@ -291,6 +302,14 @@ Berikan 3 opsi gaya (formal, impact_focused, concise_pitch) dalam format JSON va
     }
 
     const model = (options.model || DEFAULT_MODEL).replace(/^models\//, '').trim() || DEFAULT_MODEL
+    const safeCv = (cvText || '')
+      .replace(/<\/?candidate_cv[^>]*>/gi, '[candidate_cv]')
+      .replace(/<\/?job_posting[^>]*>/gi, '[job_posting]')
+      .trim()
+    const safeSubject = (currentSubject || '').replace(/[\r\n]+/g, ' ').trim()
+    const safeBody = (currentBody || '').replace(/<\/?current_draft[^>]*>/gi, '[current_draft]').trim()
+    const safeFeedback = (feedback || '').replace(/<\/?user_feedback[^>]*>/gi, '[user_feedback]').trim()
+
     const userPrompt = `Modifikasi draf email lamaran berikut berdasarkan instruksi masukan pengguna:
 
 <target_language>
@@ -298,7 +317,7 @@ ${resolvedLang === 'id' ? 'Bahasa Indonesia (id)' : 'English (en)'}
 </target_language>
 
 <candidate_cv>
-${cvText.trim()}
+${safeCv}
 </candidate_cv>
 
 <job_posting>
@@ -307,14 +326,14 @@ Perusahaan: ${job.company || 'Tidak ditentukan'}
 </job_posting>
 
 <current_draft>
-Subject: ${currentSubject}
+Subject: ${safeSubject}
 
 Body:
-${currentBody}
+${safeBody}
 </current_draft>
 
 <user_feedback>
-${feedback.trim()}
+${safeFeedback}
 </user_feedback>
 
 Berikan versi revisi lengkap dalam format JSON valid sesuai skema.`
@@ -397,13 +416,21 @@ Berikan versi revisi lengkap dalam format JSON valid sesuai skema.`
    * Helper to parse JSON from AI response cleanly
    */
   private static parseJsonSafe(rawText: string): any {
-    let cleaned = rawText.trim()
-    if (cleaned.startsWith('```json')) {
-      cleaned = cleaned.replace(/^```json\s*/i, '').replace(/```\s*$/i, '')
-    } else if (cleaned.startsWith('```')) {
-      cleaned = cleaned.replace(/^```\s*/, '').replace(/```\s*$/i, '')
+    let cleaned = (rawText || '').trim()
+
+    // Extract content from markdown code fences if present
+    const fenceMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)
+    if (fenceMatch) {
+      cleaned = fenceMatch[1].trim()
+    } else {
+      // If no fence, isolate outermost JSON object bounds { ... }
+      const firstBrace = cleaned.indexOf('{')
+      const lastBrace = cleaned.lastIndexOf('}')
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        cleaned = cleaned.substring(firstBrace, lastBrace + 1).trim()
+      }
     }
-    return JSON.parse(cleaned.trim())
+    return JSON.parse(cleaned)
   }
 
   /**

@@ -112,15 +112,27 @@ export class CVParserService {
    * Extract plain text from PDF ArrayBuffer using pdfjs-dist with fallback
    */
   static async extractTextFromPdf(data: ArrayBuffer | Uint8Array): Promise<string> {
+    // Preserve an intact copy because PDF.js may transfer/detach ArrayBuffer internally
+    const rawBytes = data instanceof Uint8Array ? data.slice() : new Uint8Array(data).slice()
+
     try {
-      // In web extension / bundler environments, disable external worker to avoid CSP / worker file errors
-      if (pdfjsLib.GlobalWorkerOptions) {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = ''
+      // In web extension environment, configure worker from extension assets if available
+      if (pdfjsLib.GlobalWorkerOptions && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
+        if (typeof window !== 'undefined' && (window as any).chrome?.runtime?.getURL) {
+          try {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = (window as any).chrome.runtime.getURL('assets/pdf.worker.mjs')
+          } catch {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = ''
+          }
+        } else {
+          pdfjsLib.GlobalWorkerOptions.workerSrc = ''
+        }
       }
 
-      const uint8Array = data instanceof Uint8Array ? data : new Uint8Array(data)
+      // Clone a copy for PDF.js so rawBytes remains intact if PDF.js transfers the buffer
+      const pdfData = rawBytes.slice()
       const loadingTask = pdfjsLib.getDocument({
-        data: uint8Array,
+        data: pdfData,
         useWorkerFetch: false,
         useSystemFonts: true,
       })
@@ -162,7 +174,7 @@ export class CVParserService {
     }
 
     // Binary text fallback: extracts printable ASCII / UTF-8 characters from binary stream
-    return this.fallbackBinaryTextExtractor(data)
+    return this.fallbackBinaryTextExtractor(rawBytes)
   }
 
   /**
@@ -279,7 +291,6 @@ export class CVParserService {
    */
   private static extractSkills(text: string): CVSkillCategory[] {
     const categories: CVSkillCategory[] = []
-    const lowerText = text.toLowerCase()
 
     for (const [categoryName, keywords] of Object.entries(SKILL_TAXONOMY)) {
       const matchedItems: string[] = []
@@ -289,7 +300,7 @@ export class CVParserService {
         const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
         const regex = new RegExp(`(^|[^a-zA-Z0-9_#+])${escaped}([^a-zA-Z0-9_#+]|$)`, 'i')
 
-        if (regex.test(text) || lowerText.includes(keyword.toLowerCase())) {
+        if (regex.test(text)) {
           if (!matchedItems.includes(keyword)) {
             matchedItems.push(keyword)
           }

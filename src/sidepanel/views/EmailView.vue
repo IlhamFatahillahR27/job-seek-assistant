@@ -13,6 +13,7 @@ import {
   Sliders,
   ChevronRight,
   Briefcase,
+  Link,
 } from 'lucide-vue-next'
 import { useEmailGenerator } from '@/composables/useEmailGenerator'
 import { useNavigation, useCVProfile, useCurrentJob } from '@/composables/useStorageState'
@@ -41,6 +42,7 @@ const {
   refineDraft,
   saveDraft,
   sendDirectly,
+  insertDriveLink,
 } = useEmailGenerator()
 
 const { setActiveTab } = useNavigation()
@@ -362,8 +364,8 @@ const openGmailDrafts = () => {
         ></textarea>
       </div>
 
-      <!-- Attachment Toggle -->
-      <div class="pt-1 border-t border-gray-100 dark:border-gray-700/60">
+      <!-- Attachment Toggle & Drive Link Option -->
+      <div class="pt-1 border-t border-gray-100 dark:border-gray-700/60 space-y-2">
         <label class="flex items-start space-x-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer select-none">
           <input
             v-model="includeAttachment"
@@ -373,7 +375,7 @@ const openGmailDrafts = () => {
           <div class="space-y-0.5">
             <span class="font-medium flex items-center space-x-1">
               <Paperclip class="h-3 w-3 text-gray-400" />
-              <span>Sertakan Lampiran PDF CV dari Google Drive</span>
+              <span>Sertakan Lampiran PDF CV dari Google Drive (&le; 10 MB)</span>
             </span>
             <p v-if="cvProfile?.fileName" class="text-[10px] text-gray-500 dark:text-gray-400">
               File terpasang: <span class="font-medium text-gray-700 dark:text-gray-300">{{ cvProfile.fileName }}</span>
@@ -383,6 +385,18 @@ const openGmailDrafts = () => {
             </p>
           </div>
         </label>
+
+        <div v-if="cvProfile?.fileId || cvProfile?.webViewLink" class="flex items-center justify-between pl-5 text-[11px] pt-0.5 border-t border-dashed border-gray-100 dark:border-gray-750">
+          <span class="text-[10px] text-gray-500 dark:text-gray-400">Tautan Cloud Drive:</span>
+          <button
+            type="button"
+            @click="insertDriveLink()"
+            class="inline-flex items-center space-x-1 text-[10px] font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 hover:underline"
+          >
+            <Link class="h-3 w-3" />
+            <span>+ Sisipkan Link CV ke Body Email</span>
+          </button>
+        </div>
       </div>
     </div>
 

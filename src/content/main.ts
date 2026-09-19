@@ -27,6 +27,6 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendRe
     }
   }
 
-  // Return true if async handling is needed (or synchronous response via sendResponse)
-  return true
+  // Return false/undefined since extraction is synchronous
+  return false
 })

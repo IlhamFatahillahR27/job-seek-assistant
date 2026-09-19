@@ -430,10 +430,23 @@ SKEMA JSON OUTPUT:
    * Constructs prompt with strict context isolation XML tags
    */
   private static buildAnalysisPrompt(cvText: string, job: JobDetails): string {
+    const safeCv = (cvText || '')
+      .replace(/<\/?candidate_cv[^>]*>/gi, '[candidate_cv]')
+      .replace(/<\/?job_posting[^>]*>/gi, '[job_posting]')
+      .trim()
+
+    const safeDesc = (job.description || '')
+      .replace(/<\/?job_posting[^>]*>/gi, '[job_posting]')
+      .trim()
+
+    const safeReq = (job.requirements || '')
+      .replace(/<\/?job_posting[^>]*>/gi, '[job_posting]')
+      .trim()
+
     return `Evaluasi kesesuaian antara kandidat dan lowongan berikut sesuai aturan anti-halusinasi:
 
 <candidate_cv>
-${cvText.trim()}
+${safeCv}
 </candidate_cv>
 
 <job_posting>
@@ -443,28 +456,33 @@ Lokasi: ${job.location || 'Tidak ditentukan'}
 Model Kerja: ${job.workplaceType || 'Tidak ditentukan'}
 
 Deskripsi Lowongan:
-${job.description || 'Tidak ada deskripsi'}
+${safeDesc || 'Tidak ada deskripsi'}
 
 Persyaratan & Kualifikasi:
-${job.requirements || 'Lihat deskripsi pekerjaan'}
+${safeReq || 'Lihat deskripsi pekerjaan'}
 </job_posting>
 
 Berikan hasil evaluasi lengkap dalam format JSON yang valid.`
   }
 
   /**
-   * Safely parse JSON from raw text response, cleaning any code block wrappers
+   * Safely parse JSON from raw text response, cleaning any code block wrappers and preambles
    */
   public static parseJsonResponse(rawText: string): GeminiRawAnalysisResponse {
-    let cleaned = rawText.trim()
+    let cleaned = (rawText || '').trim()
 
-    // Remove markdown code fences if present
-    if (cleaned.startsWith('```json')) {
-      cleaned = cleaned.replace(/^```json\s*/i, '').replace(/```\s*$/i, '')
-    } else if (cleaned.startsWith('```')) {
-      cleaned = cleaned.replace(/^```\s*/, '').replace(/```\s*$/i, '')
+    // Extract content from markdown code fences if present
+    const fenceMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)
+    if (fenceMatch) {
+      cleaned = fenceMatch[1].trim()
+    } else {
+      // If no fence, isolate outermost JSON object bounds { ... }
+      const firstBrace = cleaned.indexOf('{')
+      const lastBrace = cleaned.lastIndexOf('}')
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        cleaned = cleaned.substring(firstBrace, lastBrace + 1).trim()
+      }
     }
-    cleaned = cleaned.trim()
 
     try {
       const parsed = JSON.parse(cleaned)

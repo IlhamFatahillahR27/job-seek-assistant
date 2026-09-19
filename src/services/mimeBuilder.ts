@@ -21,14 +21,32 @@ export interface MimeMessageOptions {
 
 export class MimeBuilderService {
   /**
+   * Sanitize header values against CRLF injection (CWE-93)
+   */
+  static sanitizeHeaderValue(val: string): string {
+    return (val || '').replace(/[\r\n]+/g, ' ').trim()
+  }
+
+  /**
+   * Sanitize attachment filename against quote escaping and CRLF injection
+   */
+  static sanitizeFilename(filename: string): string {
+    const stripped = this.sanitizeHeaderValue(filename).replace(/["\\]/g, '_')
+    return stripped || 'attachment.pdf'
+  }
+
+  /**
    * Convert an ArrayBuffer or Uint8Array to a standard base64 string
+   * Uses 32KB chunking to avoid maximum call stack errors and memory thrashing on large buffers
    */
   static bufferToBase64(buffer: ArrayBuffer | Uint8Array): string {
     const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer)
-    let binary = ''
     const len = bytes.byteLength
-    for (let i = 0; i < len; i++) {
-      binary += String.fromCharCode(bytes[i])
+    const chunkSize = 0x8000 // 32KB chunk
+    let binary = ''
+    for (let i = 0; i < len; i += chunkSize) {
+      const chunk = bytes.subarray(i, Math.min(i + chunkSize, len))
+      binary += String.fromCharCode.apply(null, chunk as unknown as number[])
     }
     return btoa(binary)
   }
@@ -60,9 +78,9 @@ export class MimeBuilderService {
    * Encodes a header according to RFC 2047 (B-encoding) for non-ASCII safety
    */
   static encodeHeaderUtf8(headerValue: string): string {
-    // If ASCII only and no special characters, it can stay as is,
-    // but wrapping in RFC 2047 ensures 100% UTF-8 character preservation across email clients
-    const base64 = this.stringToBase64Utf8(headerValue)
+    // Sanitize any newline before encoding
+    const safeValue = this.sanitizeHeaderValue(headerValue)
+    const base64 = this.stringToBase64Utf8(safeValue)
     return `=?UTF-8?B?${base64}?=`
   }
 
@@ -80,16 +98,18 @@ export class MimeBuilderService {
    */
   static buildRfc2822Raw(options: MimeMessageOptions): string {
     const { to, subject, body, from, attachment } = options
-    const encodedSubject = this.encodeHeaderUtf8(subject)
+    const safeTo = this.sanitizeHeaderValue(to)
+    const safeSubject = this.encodeHeaderUtf8(subject)
 
     const headers: string[] = [
-      `To: ${to.trim()}`,
-      `Subject: ${encodedSubject}`,
+      `To: ${safeTo}`,
+      `Subject: ${safeSubject}`,
       'MIME-Version: 1.0',
     ]
 
     if (from && from.trim()) {
-      headers.push(`From: ${from.trim()}`)
+      const safeFrom = this.sanitizeHeaderValue(from)
+      headers.push(`From: ${safeFrom}`)
     }
 
     if (!attachment) {
@@ -114,6 +134,7 @@ export class MimeBuilderService {
       attachmentBase64 = this.bufferToBase64(attachment.data)
     }
     const formattedAttachmentData = this.chunkBase64(attachmentBase64)
+    const safeAttachmentFilename = this.sanitizeFilename(attachment.filename)
 
     const parts: string[] = [
       headers.join('\r\n'),
@@ -125,8 +146,8 @@ export class MimeBuilderService {
       body,
       '',
       `--${boundary}`,
-      `Content-Type: ${attachment.mimeType || 'application/pdf'}; name="${attachment.filename}"`,
-      `Content-Disposition: attachment; filename="${attachment.filename}"`,
+      `Content-Type: ${attachment.mimeType || 'application/pdf'}; name="${safeAttachmentFilename}"`,
+      `Content-Disposition: attachment; filename="${safeAttachmentFilename}"`,
       'Content-Transfer-Encoding: base64',
       '',
       formattedAttachmentData,
