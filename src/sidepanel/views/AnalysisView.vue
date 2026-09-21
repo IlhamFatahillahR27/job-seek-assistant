@@ -35,9 +35,11 @@ const {
 const {
   currentJob,
   isExtracting,
+  isExtractingAi,
   extractionError,
   successMessage,
   extractFromActiveTab,
+  extractWithAI,
   updateJob,
   resetJob,
   createEmptyJob,
@@ -65,7 +67,24 @@ watch(
 const handleExtract = async () => {
   try {
     isSaved.value = false
-    await extractFromActiveTab()
+    const extracted = await extractFromActiveTab()
+    if (extracted) {
+      editableJob.value = JSON.parse(JSON.stringify(extracted))
+      showManualForm.value = true
+    }
+  } catch {
+    // Error is handled reactively by useJobExtractor
+  }
+}
+
+const handleExtractAi = async () => {
+  try {
+    isSaved.value = false
+    const extracted = await extractWithAI()
+    if (extracted) {
+      editableJob.value = JSON.parse(JSON.stringify(extracted))
+      showManualForm.value = true
+    }
   } catch {
     // Error is handled reactively by useJobExtractor
   }
@@ -188,28 +207,55 @@ const getPlatformBadge = (platform?: string) => {
         <h2 class="text-xs font-semibold uppercase tracking-wider">Ekstraksi Lowongan Kerja</h2>
       </div>
       <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-        Buka halaman detail lowongan (LinkedIn, Glints, Jobstreet, Indeed, atau situs karir perusahaan) dan klik tombol di bawah.
+        Buka halaman detail lowongan (LinkedIn, Glints, Jobstreet, Indeed, atau situs karir) dan pilih metode ekstraksi:
       </p>
 
       <div class="mt-3 flex flex-col gap-2">
-        <button
-          type="button"
-          @click="handleExtract"
-          :disabled="isExtracting"
-          class="flex w-full items-center justify-center space-x-2 rounded-lg bg-indigo-600 px-3.5 py-2.5 text-xs font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 transition-colors"
-        >
-          <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': isExtracting }" />
-          <span>{{ isExtracting ? 'Mengekstrak Halaman Aktif...' : 'Ekstrak Halaman Lowongan Ini' }}</span>
-        </button>
+        <div class="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            @click="handleExtract"
+            :disabled="isExtracting"
+            class="flex items-center justify-center space-x-1.5 rounded-lg bg-indigo-600 px-2.5 py-2.5 text-xs font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 transition-colors"
+            title="Ekstrak cepat menggunakan struktur DOM halaman web"
+          >
+            <RefreshCw class="h-3.5 w-3.5" :class="{ 'animate-spin': isExtracting && !isExtractingAi }" />
+            <span class="truncate">{{ isExtracting && !isExtractingAi ? 'Mengekstrak...' : 'Ekstrak Halaman' }}</span>
+          </button>
 
-        <button
-          type="button"
-          @click="handleOpenManual"
-          class="flex items-center justify-center space-x-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 transition-colors"
-        >
-          <Edit3 class="h-3.5 w-3.5" />
-          <span>{{ showManualForm ? 'Tutup Formulir Rincian' : 'Input Lowongan Manual' }}</span>
-        </button>
+          <button
+            type="button"
+            @click="handleExtractAi"
+            :disabled="isExtracting"
+            class="flex items-center justify-center space-x-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 px-2.5 py-2.5 text-xs font-medium text-white shadow-sm hover:from-purple-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 transition-colors"
+            title="Ekstrak cerdas berbasis Gemini AI membaca seluruh konten visual halaman"
+          >
+            <Sparkles class="h-3.5 w-3.5" :class="{ 'animate-spin': isExtractingAi }" />
+            <span class="truncate">{{ isExtractingAi ? 'AI Membaca...' : 'Ekstrak AI ✨' }}</span>
+          </button>
+        </div>
+
+        <div class="flex items-center space-x-2">
+          <button
+            type="button"
+            @click="handleOpenManual"
+            class="flex-1 flex items-center justify-center space-x-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 transition-colors"
+          >
+            <Edit3 class="h-3.5 w-3.5" />
+            <span>{{ showManualForm ? 'Tutup Formulir Rincian' : 'Input Lowongan Manual' }}</span>
+          </button>
+
+          <button
+            v-if="showManualForm || editableJob.title || editableJob.description"
+            type="button"
+            @click="handleReset"
+            class="flex items-center justify-center space-x-1 rounded-lg border border-red-200 bg-red-50/50 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-400 transition-colors"
+            title="Kosongkan formulir lowongan"
+          >
+            <Trash2 class="h-3.5 w-3.5" />
+            <span>Reset</span>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -227,6 +273,21 @@ const getPlatformBadge = (platform?: string) => {
           >
             {{ getPlatformBadge(editableJob.platform).label }}
           </span>
+
+          <span
+            v-if="editableJob.extractionMethod === 'ai'"
+            class="inline-flex items-center space-x-1 rounded-md bg-purple-100 px-1.5 py-0.5 text-[9px] font-medium text-purple-700 dark:bg-purple-950 dark:text-purple-300"
+          >
+            <Sparkles class="h-2.5 w-2.5" />
+            <span>AI Extracted</span>
+          </span>
+          <span
+            v-else-if="editableJob.extractionMethod === 'dom'"
+            class="rounded-md bg-gray-100 px-1.5 py-0.5 text-[9px] font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+          >
+            DOM Scraper
+          </span>
+
           <a
             v-if="editableJob.url && editableJob.url.startsWith('http')"
             :href="editableJob.url"
@@ -236,7 +297,7 @@ const getPlatformBadge = (platform?: string) => {
             title="Buka URL asli lowongan"
           >
             <ExternalLink class="h-3 w-3" />
-            <span class="truncate max-w-[130px] hidden sm:inline">Buka Sumber</span>
+            <span class="truncate max-w-[110px] hidden sm:inline">Buka Sumber</span>
           </a>
         </div>
 
@@ -331,9 +392,22 @@ const getPlatformBadge = (platform?: string) => {
         </div>
 
         <div>
-          <label class="block text-[11px] font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Deskripsi Pekerjaan
-          </label>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-[11px] font-medium text-gray-700 dark:text-gray-300">
+              Deskripsi Pekerjaan
+            </label>
+            <button
+              v-if="editableJob.description.includes('tidak ditemukan') || !editableJob.description.trim()"
+              type="button"
+              @click="handleExtractAi"
+              :disabled="isExtracting"
+              class="inline-flex items-center space-x-1 text-[11px] font-medium text-purple-600 hover:text-purple-700 dark:text-purple-400"
+              title="Ekstrak ulang deskripsi menggunakan Gemini AI"
+            >
+              <Sparkles class="h-3 w-3" />
+              <span>Ekstrak Cerdas AI ✨</span>
+            </button>
+          </div>
           <textarea
             v-model="editableJob.description"
             rows="4"

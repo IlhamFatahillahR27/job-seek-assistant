@@ -1,5 +1,5 @@
 import type { WorkplaceType } from '@/types/job'
-import { cleanJobText, sanitizePromptInjection, extractEmailsFromText } from '@/utils/sanitizer'
+import { cleanJobText, sanitizePromptInjection, extractEmailsFromText, cleanDomElement } from '@/utils/sanitizer'
 
 /**
  * Safely find the first matching selector and return its trimmed text content
@@ -65,7 +65,7 @@ export function detectWorkplaceType(text: string): WorkplaceType {
  * Separate job description into main description and requirements if obvious headers exist
  */
 export function splitRequirements(fullText: string): { description: string; requirements: string } {
-  const reqHeaderPattern = /(?:^|\n)(#{1,4}\s*)?(?:persyaratan|kualifikasi|requirements|qualifications|what\s+you(?:'ll|\s+will)\s+need|who\s+you\s+are|kriteria|skills\s*&\s*experience)[:\s]*\n/i
+  const reqHeaderPattern = /(?:^|\n)(#{1,4}\s*)?(?:persyaratan|kualifikasi|requirements|qualifications|what\s+you(?:'ll|\s+will)\s+need|who\s+you\s+are|about\s+you|kriteria|skills\s*&\s*experience)(?:[:\s]*\n|:\s+)/i
   const match = fullText.match(reqHeaderPattern)
 
   if (match && match.index !== undefined) {
@@ -139,3 +139,82 @@ export function processScrapedContent(params: {
     recruiterEmail: recruiterEmail || '',
   }
 }
+
+/**
+ * Converts a DOM element to formatted plain text with preserved line breaks,
+ * paragraph spacing, and bullet points for list items.
+ */
+export function domToFormattedText(element: Element): string {
+  if (!element) return ''
+
+  // 1. If in a real browser where innerText is available on an attached element,
+  // innerText naturally reflects CSS layout, line breaks, and block elements.
+  if (typeof (element as any).innerText === 'string' && (element as any).isConnected) {
+    const raw = (element as any).innerText.trim()
+    if (raw.includes('\n')) {
+      return cleanJobText(raw)
+    }
+  }
+
+  // 2. Structural DOM conversion preserving block elements & list bullets:
+  const cloned = element.cloneNode(true) as Element
+  cleanDomElement(cloned)
+
+  // Replace <br> tags with newline
+  const brTags = Array.from(cloned.querySelectorAll('br'))
+  brTags.forEach((br) => {
+    br.replaceWith('\n')
+  })
+
+  // Format list items with bullet point and newline
+  const liTags = Array.from(cloned.querySelectorAll('li'))
+  liTags.forEach((li) => {
+    const text = li.textContent?.trim() || ''
+    if (text) {
+      li.textContent = `• ${text}\n`
+    }
+  })
+
+  // Ensure paragraphs, headings, and table rows end with double newlines
+  const blockTags = Array.from(cloned.querySelectorAll('p, h1, h2, h3, h4, h5, h6, tr, blockquote'))
+  blockTags.forEach((block) => {
+    block.append('\n\n')
+  })
+
+  // Ensure sections, divs, and articles end with newline
+  const divTags = Array.from(cloned.querySelectorAll('div, section, article, ul, ol'))
+  divTags.forEach((d) => {
+    d.append('\n')
+  })
+
+  const text = cloned.textContent || ''
+  return cleanJobText(text)
+}
+
+/**
+ * Extract clean visible text of the active page/job container for AI analysis or fallback
+ */
+export function extractPageVisibleText(doc: Document): string {
+  try {
+    const target =
+      doc.querySelector(
+        '[data-automation="jobDetailsPage"], [data-automation="splitViewDetails"], [data-automation="jobAdDetails"], [data-automation="jobDescription"], [data-testid="job-details-pane"], main, article, [role="main"]'
+      ) || doc.body
+
+    if (!target) return ''
+
+    let text = domToFormattedText(target)
+    if (!text || text.length < 50) {
+      text = (target as any).innerText || target.textContent || ''
+    }
+
+    const cleaned = cleanJobText(text)
+    const safe = sanitizePromptInjection(cleaned)
+
+    return safe.slice(0, 15000)
+  } catch {
+    return ''
+  }
+}
+
+

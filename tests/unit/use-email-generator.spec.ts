@@ -8,11 +8,11 @@ import type { JobDetails } from '@/types/job'
 const mockCV: CVProfile = {
   id: 'cv_123',
   source: 'google_drive',
-  fileName: 'Ilham_Resume.pdf',
+  fileName: 'Test_User_Resume.pdf',
   fileId: 'gdrive_file_999',
   parsedAt: new Date().toISOString(),
   profileSummary: 'Senior Frontend Engineer with 5+ years experience.',
-  rawText: `ILHAM FATAHILLAH
+  rawText: `Test User
 Senior Frontend Engineer
 Keahlian: Vue.js 3, TypeScript, Tailwind CSS.
 Pengalaman: Tech Titan Nusantara, meningkatkan performa web 45%.`,

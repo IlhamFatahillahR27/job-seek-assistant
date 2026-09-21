@@ -88,7 +88,8 @@ describe('GoogleAuthService Unit Tests', () => {
 
     const result = await GoogleAuthService.login()
     expect(result.token).toBe('demo_mock_token_12345')
-    expect(result.profile.email).toBe('pelamar.kerja@gmail.com')
+    expect(result.profile.email).toBe('test.user@example.com')
+    expect(result.profile.name).toBe('Test User (Demo)')
 
     const status = await GoogleAuthService.checkAuthStatus()
     expect(status.status).toBe('connected')

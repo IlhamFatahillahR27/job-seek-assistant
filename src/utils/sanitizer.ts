@@ -60,14 +60,16 @@ export function cleanDomElement(element: Element): void {
     nodes.forEach((node) => node.remove())
   })
 
-  // Selectors matching ads, cookie consent, dialogs, and hidden attributes
+  // Selectors matching third-party banner ads, cookie consent, dialogs, and navigation
   const selectorsToRemove = [
     '[hidden]',
     '[aria-hidden="true"]',
     '[class*="cookie"]',
     '[id*="cookie"]',
-    '[class*="advertisement"]',
-    '[class*="ad-container"]',
+    '[class*="google-ad"]',
+    '[id*="google_ads"]',
+    'ins.adsbygoogle',
+    '[data-ad-client]',
     '[class*="nav-menu"]',
     '[class*="social-share"]',
     '[class*="modal"]',
@@ -99,23 +101,6 @@ export function cleanDomElement(element: Element): void {
     ) {
       htmlEl.remove()
       return
-    }
-
-    // Check computed style if available in browser context
-    if (typeof window !== 'undefined' && typeof window.getComputedStyle === 'function') {
-      try {
-        const computed = window.getComputedStyle(htmlEl)
-        if (
-          computed.display === 'none' ||
-          computed.visibility === 'hidden' ||
-          computed.opacity === '0' ||
-          computed.fontSize === '0px'
-        ) {
-          htmlEl.remove()
-        }
-      } catch {
-        // Continue if getComputedStyle is unsupported
-      }
     }
   })
 }

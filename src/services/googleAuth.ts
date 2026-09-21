@@ -96,8 +96,8 @@ export class GoogleAuthService {
     if (token === 'demo_mock_token_12345') {
       return {
         id: 'demo_user_001',
-        email: 'pelamar.kerja@gmail.com',
-        name: 'Ilham Fatahillah (Demo)',
+        email: 'test.user@example.com',
+        name: 'Test User (Demo)',
         picture: 'https://lh3.googleusercontent.com/a/default-user=s96-c',
       }
     }
@@ -165,8 +165,8 @@ export class GoogleAuthService {
     if (settings.useDemoDriveMode) {
       const demoProfile: GoogleUserProfile = {
         id: 'demo_user_001',
-        email: 'pelamar.kerja@gmail.com',
-        name: 'Ilham Fatahillah (Demo)',
+        email: 'test.user@example.com',
+        name: 'Test User (Demo)',
         picture: 'https://lh3.googleusercontent.com/a/default-user=s96-c',
       }
 
@@ -367,8 +367,8 @@ export class GoogleAuthService {
         status: 'connected',
         profile: {
           id: 'demo_user_001',
-          email: 'pelamar.kerja@gmail.com',
-          name: 'Ilham Fatahillah (Demo)',
+          email: 'test.user@example.com',
+          name: 'Test User (Demo)',
           picture: 'https://lh3.googleusercontent.com/a/default-user=s96-c',
         },
       }

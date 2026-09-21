@@ -32,14 +32,39 @@ describe('GeminiClientService Unit Tests', () => {
               supportedGenerationMethods: ['generateContent', 'countTokens'],
             },
             {
+              name: 'models/gemini-2.0-flash-thinking-exp',
+              displayName: 'Gemini 2.0 Flash Thinking Exp',
+              supportedGenerationMethods: ['generateContent'],
+            },
+            {
               name: 'models/gemini-1.5-flash-latest',
               displayName: 'Gemini 1.5 Flash Latest',
+              supportedGenerationMethods: ['generateContent'],
+            },
+            {
+              name: 'models/imagen-3.0-generate-002',
+              displayName: 'Imagen 3.0',
+              supportedGenerationMethods: ['generateContent', 'generateImages'],
+            },
+            {
+              name: 'models/veo-2.0-generate-001',
+              displayName: 'Veo Video Generator',
+              supportedGenerationMethods: ['generateContent'],
+            },
+            {
+              name: 'models/gemini-audio-speech-001',
+              displayName: 'Gemini Speech TTS',
               supportedGenerationMethods: ['generateContent'],
             },
             {
               name: 'models/text-embedding-004',
               displayName: 'Text Embedding',
               supportedGenerationMethods: ['embedContent'],
+            },
+            {
+              name: 'models/aqa',
+              displayName: 'Attributed QA',
+              supportedGenerationMethods: ['generateAnswer'],
             },
           ],
         }),
@@ -48,9 +73,23 @@ describe('GeminiClientService Unit Tests', () => {
       const result = await GeminiClientService.validateApiKey('valid-test-key-123')
       expect(result.valid).toBe(true)
       expect(result.models).toContain('gemini-2.0-flash')
+      expect(result.models).toContain('gemini-2.0-flash-thinking-exp')
       expect(result.models).toContain('gemini-1.5-flash-latest')
+
+      // Ensure all non-reasoning / multimedia models are strictly excluded
+      expect(result.models).not.toContain('imagen-3.0-generate-002')
+      expect(result.models).not.toContain('veo-2.0-generate-001')
+      expect(result.models).not.toContain('gemini-audio-speech-001')
       expect(result.models).not.toContain('text-embedding-004')
-      expect(result.availableModels).toHaveLength(2)
+      expect(result.models).not.toContain('aqa')
+
+      // Only the 3 logical reasoning models should be returned
+      expect(result.availableModels).toHaveLength(3)
+
+      // Verify thinking tag and top priority
+      const thinkingModel = result.availableModels?.find((m) => m.id === 'gemini-2.0-flash-thinking-exp')
+      expect(thinkingModel?.isThinking).toBe(true)
+      expect(result.availableModels?.[0].id).toBe('gemini-2.0-flash-thinking-exp')
     })
 
     it('should handle HTTP 400/403 invalid API key gracefully', async () => {
@@ -108,7 +147,7 @@ describe('GeminiClientService Unit Tests', () => {
     }
 
     const mockCv = `
-ILHAM FATAHILLAH
+Test User
 Frontend Engineer
 Pengalaman: 4 tahun mengembangkan aplikasi dengan Vue 3, TypeScript, dan Tailwind CSS.
 Pendidikan: S1 Teknik Informatika.
@@ -320,6 +359,73 @@ Pendidikan: S1 Teknik Informatika.
       expect(mockResult.matched_skills.some((m) => m.skill === 'Vue 3')).toBe(true)
       expect(mockResult.missing_skills.length).toBeGreaterThan(0)
       expect(mockResult.interview_highlights.length).toBeGreaterThan(0)
+    })
+  })
+
+  describe('extractJobWithAI & generateMockJobExtraction', () => {
+    it('should extract structured job details using Gemini generateContent', async () => {
+      const mockApiResponse = {
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify({
+                    title: 'Senior DevOps Specialist',
+                    company: 'PT Cloud Nusantara',
+                    location: 'Jakarta (Hybrid)',
+                    workplaceType: 'Hybrid',
+                    description: 'Bertanggung jawab atas otomatisasi CI/CD dan cluster Kubernetes.',
+                    requirements: 'Minimal 4 tahun pengalaman Kubernetes, Docker, dan Terraform.',
+                    recruiterEmail: 'hr@cloudnusantara.id',
+                  }),
+                },
+              ],
+            },
+          },
+        ],
+      }
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => mockApiResponse,
+      } as any)
+
+      const result = await GeminiClientService.extractJobWithAI({
+        apiKey: 'valid-gemini-key',
+        pageText: 'Lowongan Kerja PT Cloud Nusantara mencari Senior DevOps Specialist...',
+        url: 'https://www.jobstreet.co.id/id/job/12345',
+        pageTitle: 'Senior DevOps Specialist - Jobstreet',
+      })
+
+      expect(result.title).toBe('Senior DevOps Specialist')
+      expect(result.company).toBe('PT Cloud Nusantara')
+      expect(result.workplaceType).toBe('Hybrid')
+      expect(result.description).toContain('Kubernetes')
+      expect(result.requirements).toContain('Terraform')
+      expect(result.recruiterEmail).toBe('hr@cloudnusantara.id')
+      expect(result.platform).toBe('jobstreet')
+      expect(result.extractionMethod).toBe('ai')
+    })
+
+    it('should fallback to mock job extraction in Demo Mode or when API key is empty', async () => {
+      const mockText = `PT Solusi Mega Teknologi
+Senior Software Engineer
+Jakarta, Indonesia
+Kami mencari Senior Software Engineer yang handal dalam Vue 3 dan Golang.`
+
+      const result = await GeminiClientService.extractJobWithAI({
+        apiKey: '',
+        pageText: mockText,
+        url: 'https://glints.com/id/opportunities/jobs/dev-1',
+        forceDemo: true,
+      })
+
+      expect(result.title).toBeDefined()
+      expect(result.company).toBeDefined()
+      expect(result.extractionMethod).toBe('ai')
+      expect(result.platform).toBe('glints')
     })
   })
 })

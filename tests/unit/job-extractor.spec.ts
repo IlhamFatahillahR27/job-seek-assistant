@@ -91,4 +91,51 @@ describe('useJobExtractor Composable Unit Tests', () => {
     const saved = await storageService.get<JobDetails | null>(STORAGE_KEYS.CURRENT_JOB, null)
     expect(saved).toBeNull()
   })
+
+  it('should automatically fallback to AI extraction when DOM description is incomplete', async () => {
+    chromeMock.tabs.sendMessage.mockResolvedValueOnce({
+      type: 'SCRAPE_JOB_SUCCESS',
+      payload: {
+        id: 'job_dom_incomplete',
+        url: 'https://www.jobstreet.co.id/id/job/999',
+        title: 'Full Stack Engineer',
+        company: 'PT Global Tech',
+        description: 'Deskripsi pekerjaan tidak ditemukan',
+        requirements: '',
+        platform: 'jobstreet',
+        extractedAt: new Date().toISOString(),
+        rawPageText: 'PT Global Tech membuka lowongan Full Stack Engineer. Tanggung jawab: Mengembangkan web app dengan Vue dan Laravel. Kualifikasi: 3 tahun pengalaman.',
+      },
+    })
+
+    const { extractFromActiveTab, currentJob, successMessage } = useJobExtractor()
+    const result = await extractFromActiveTab()
+
+    expect(result.extractionMethod).toBe('ai')
+    expect(currentJob.value?.extractionMethod).toBe('ai')
+    expect(successMessage.value).toContain('Gemini AI')
+  })
+
+  it('should support force AI extraction via extractWithAI', async () => {
+    chromeMock.tabs.sendMessage.mockResolvedValueOnce({
+      type: 'SCRAPE_JOB_SUCCESS',
+      payload: {
+        id: 'job_dom_1',
+        url: 'https://glints.com/id/opportunities/jobs/ai-1',
+        title: 'Software Developer',
+        company: 'Tech Asia',
+        description: 'Teks dari DOM scraper',
+        requirements: 'Syarat',
+        platform: 'glints',
+        extractedAt: new Date().toISOString(),
+        rawPageText: 'Tech Asia mencari Software Developer untuk membangun sistem baru.',
+      },
+    })
+
+    const { extractWithAI, currentJob } = useJobExtractor()
+    const result = await extractWithAI()
+
+    expect(result.extractionMethod).toBe('ai')
+    expect(currentJob.value?.extractionMethod).toBe('ai')
+  })
 })

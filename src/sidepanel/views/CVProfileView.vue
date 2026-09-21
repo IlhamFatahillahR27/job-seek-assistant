@@ -43,12 +43,12 @@ const selectedFileId = ref<string | null>(null)
 const statusNotice = ref<{ text: string; type: 'success' | 'info' | 'error' } | null>(null)
 
 // Manual form state
-const manualCandidateName = ref('Ilham Fatahillah')
+const manualCandidateName = ref('Test User')
 const manualHeadline = ref('Senior Software Engineer (Frontend / Vue / TypeScript)')
 const manualRawText = ref(
-`ILHAM FATAHILLAH
+`Test User
 Senior Frontend Engineer (Vue 3, TypeScript, Tailwind CSS)
-ilham@example.com | Jakarta, Indonesia
+test.user@example.com | Jakarta, Indonesia
 
 Pengalaman Kerja:
 - Senior Frontend Engineer di Tech Company (2022 - Sekarang)

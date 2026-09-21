@@ -5,7 +5,7 @@ import { DEMO_DOC_TEXT } from '@/services/googleDrive'
 describe('CVParserService Unit Tests', () => {
   it('should parse structured CV text into a comprehensive CVProfile', () => {
     const profile = CVParserService.parseTextToProfile(DEMO_DOC_TEXT, {
-      fileName: 'Ilham_Fatahillah_Resume.pdf',
+      fileName: 'Test_User_Resume.pdf',
       fileId: 'file_drive_123',
       source: 'google_drive',
       mimeType: 'application/pdf',
@@ -14,7 +14,7 @@ describe('CVParserService Unit Tests', () => {
     })
 
     expect(profile.id).toBeDefined()
-    expect(profile.fileName).toBe('Ilham_Fatahillah_Resume.pdf')
+    expect(profile.fileName).toBe('Test_User_Resume.pdf')
     expect(profile.fileId).toBe('file_drive_123')
     expect(profile.source).toBe('google_drive')
     expect(profile.driveModifiedTime).toBe('2026-09-18T10:00:00Z')
@@ -70,7 +70,7 @@ Developed web applications`
   it('should extract text from binary buffer via fallback extractor when PDF.js worker is unavailable', async () => {
     // Construct simple binary buffer with readable strings
     const encoder = new TextEncoder()
-    const buffer = encoder.encode('BT (Ilham Fatahillah) Tj ET\nBT (Senior Software Engineer) Tj ET')
+    const buffer = encoder.encode('BT (Test User) Tj ET\nBT (Senior Software Engineer) Tj ET')
 
     const extracted = await CVParserService.extractTextFromPdf(buffer.buffer)
     expect(extracted).toBeTruthy()

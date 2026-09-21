@@ -20,10 +20,13 @@ const isDark = computed(() => settings.value.theme === 'dark')
       <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-sm">
         <Sparkles class="h-4 w-4" />
       </div>
-      <div>
+      <div class="flex items-center space-x-1.5">
         <h1 class="text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100">
           Job Seek Assistant
         </h1>
+        <span class="rounded bg-indigo-50 px-1 py-0.2 text-[9px] font-semibold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+          v1.0.1
+        </span>
       </div>
     </div>
 

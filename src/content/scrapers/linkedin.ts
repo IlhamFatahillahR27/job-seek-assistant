@@ -1,6 +1,5 @@
 import type { JobScraper, ScrapeResult } from './types'
-import { queryText, processScrapedContent, detectWorkplaceType } from './utils'
-import { cleanDomElement } from '@/utils/sanitizer'
+import { queryText, processScrapedContent, detectWorkplaceType, domToFormattedText } from './utils'
 
 export class LinkedInScraper implements JobScraper {
   readonly platform = 'linkedin' as const
@@ -63,10 +62,7 @@ export class LinkedInScraper implements JobScraper {
 
     let rawDesc = ''
     if (descContainers.length > 0) {
-      // Clone element before cleaning to avoid modifying live page DOM
-      const cloned = descContainers[0].cloneNode(true) as Element
-      cleanDomElement(cloned)
-      rawDesc = cloned.textContent || ''
+      rawDesc = domToFormattedText(descContainers[0])
     }
 
     const workplace = workplaceSnippet

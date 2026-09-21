@@ -82,6 +82,94 @@ export const JOBSTREET_DOM_FIXTURE = `
 </html>
 `
 
+export const JOBSTREET_SEEK_DOM_FIXTURE = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Frontend Engineer Job in Surabaya - PT Solusi Digital Asia | Jobstreet by SEEK</title>
+</head>
+<body>
+  <div>
+    <h1 data-automation="jobTitle">Senior Frontend Engineer</h1>
+    <a data-automation="job-header-company-name">PT Solusi Digital Asia</a>
+    <span data-automation="job-header-location">Surabaya, Jawa Timur</span>
+    <div data-automation="job-details-job-highlights">
+      <ul>
+        <li>Tunjangan kesehatan lengkap dan bonus tahunan</li>
+        <li>Lingkungan kerja hybrid dan fleksibel</li>
+      </ul>
+    </div>
+    <div data-automation="jobAdDetails">
+      <p>PT Solusi Digital Asia membuka kesempatan karir bagi Senior Frontend Engineer berbakat.</p>
+      <h3>Tanggung Jawab Utama:</h3>
+      <p>Mengembangkan aplikasi web berbasis Vue 3, TypeScript, dan Tailwind CSS.</p>
+      <h3>Kualifikasi:</h3>
+      <p>Minimal 4 tahun pengalaman Vue.js atau React, pemahaman micro-frontends dan RESTful APIs. Email lamaran ke recruitment@solusidigital.id.</p>
+    </div>
+  </div>
+</body>
+</html>
+`
+
+export const JOBSTREET_SPLIT_VIEW_FIXTURE = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Lowongan Pekerjaan di Surabaya | Jobstreet</title>
+</head>
+<body>
+  <div class="search-results">
+    <div class="left-list">
+      <article data-automation="normalJob">Job 1</article>
+      <article data-automation="normalJob">Job 2</article>
+    </div>
+    <div data-automation="jobDetailsPage" class="right-pane">
+      <h1 data-testid="job-detail-title">Full Stack Developer</h1>
+      <span data-automation="advertiser-name">Nusantara Software House</span>
+      <span data-automation="job-detail-location">Surabaya</span>
+      <div data-automation="jobAdDetails">
+        <p>Kami mencari Full Stack Developer untuk membangun platform logistik generasi baru.</p>
+        <p>Persyaratan: Menguasai Node.js, Laravel, Vue 3, PostgreSQL, dan Docker.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+`
+
+export const JOBSTREET_STATE_SCRIPT_FIXTURE = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Senior Web Developer & SEO Strategist Job in Bali - PT RADITYA ANUGERAH MEDIKA | Jobstreet</title>
+</head>
+<body>
+  <div id="root">
+    <div class="search-results">
+      <!-- In split view, the DOM may only have skeletons before client hydration -->
+      <div class="left-list">
+        <article data-automation="normalJob">Job Item 1</article>
+      </div>
+      <div class="detail-pane-skeleton">Loading details...</div>
+    </div>
+  </div>
+  <script>
+    window.SEEK_REDUX_DATA = {
+      "jobDetails:{\\"id\\":\\"94767759\\"}": {
+        "id": "94767759",
+        "title": "Senior Web Developer & SEO Strategist",
+        "advertiser": { "name": "PT RADITYA ANUGERAH MEDIKA" },
+        "location": { "label": "Bali" },
+        "salary": { "label": "Rp 9.000.000 – Rp 11.000.000 per month" },
+        "workTypes": { "label": "Kontrak/Temporer" },
+        "content2({\\"zone\\":\\"asia-4\\"})": "<p><strong>About the role</strong></p><p>We are looking for a Senior Web Developer &amp; SEO Strategist in Bali to build websites and lead SEO.</p><p><strong>Key responsibilities</strong></p><ul><li>Build and maintain websites</li><li>Lead SEO strategy across brands</li></ul><p><strong>About you</strong></p><ul><li>Five or more years of relevant experience in web development and SEO</li><li>Strong WordPress, HTML, CSS, JavaScript</li></ul>"
+      }
+    };
+  </script>
+</body>
+</html>
+`
+
 export const INDEED_DOM_FIXTURE = `
 <!DOCTYPE html>
 <html>

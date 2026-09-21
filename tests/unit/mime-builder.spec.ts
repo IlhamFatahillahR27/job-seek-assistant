@@ -14,7 +14,7 @@ describe('MimeBuilderService Unit Tests', () => {
   })
 
   it('should encode header to RFC 2047 UTF-8 B-encoding', () => {
-    const header = 'Lamaran Pekerjaan: Senior Engineer — Ilham'
+    const header = 'Lamaran Pekerjaan: Senior Engineer — Test User'
     const encoded = MimeBuilderService.encodeHeaderUtf8(header)
 
     expect(encoded.startsWith('=?UTF-8?B?')).toBe(true)
@@ -46,7 +46,7 @@ describe('MimeBuilderService Unit Tests', () => {
       subject: 'Senior Vue Architect - CV Attached',
       body: 'Please find my resume attached.',
       attachment: {
-        filename: 'Ilham_Resume.pdf',
+        filename: 'Test_User_Resume.pdf',
         mimeType: 'application/pdf',
         data: dummyPdf.buffer,
       },
@@ -55,8 +55,8 @@ describe('MimeBuilderService Unit Tests', () => {
     expect(raw).toContain('Content-Type: multipart/mixed; boundary="boundary_job_seek_')
     expect(raw).toContain('Content-Type: text/plain; charset="UTF-8"')
     expect(raw).toContain('Please find my resume attached.')
-    expect(raw).toContain('Content-Type: application/pdf; name="Ilham_Resume.pdf"')
-    expect(raw).toContain('Content-Disposition: attachment; filename="Ilham_Resume.pdf"')
+    expect(raw).toContain('Content-Type: application/pdf; name="Test_User_Resume.pdf"')
+    expect(raw).toContain('Content-Disposition: attachment; filename="Test_User_Resume.pdf"')
     expect(raw).toContain('Content-Transfer-Encoding: base64')
     // Check base64 of "%PDF-1.4" -> JVBERi0xLjQ=
     expect(raw).toContain('JVBERi0xLjQ=')

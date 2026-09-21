@@ -190,8 +190,29 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
           if (activeTab.url?.startsWith('chrome://') || activeTab.url?.startsWith('chrome-extension://') || activeTab.url?.startsWith('edge://')) {
             throw new Error('Halaman sistem peramban tidak dapat diekstrak. Silakan buka halaman lowongan kerja pada website publik.')
           }
-          const response = await chrome.tabs.sendMessage(activeTab.id, { type: 'SCRAPE_JOB_PAGE' })
-          return response
+          try {
+            const response = await chrome.tabs.sendMessage(activeTab.id, { type: 'SCRAPE_JOB_PAGE' })
+            return response
+          } catch (tabErr) {
+            // Auto-inject content script if receiving end does not exist (e.g. extension reload)
+            if (chrome.scripting && chrome.runtime?.getManifest) {
+              try {
+                const manifest = chrome.runtime.getManifest()
+                const scriptFiles = manifest.content_scripts?.[0]?.js
+                if (scriptFiles && scriptFiles.length > 0) {
+                  await chrome.scripting.executeScript({
+                    target: { tabId: activeTab.id },
+                    files: scriptFiles,
+                  })
+                  await new Promise((r) => setTimeout(r, 200))
+                  return await chrome.tabs.sendMessage(activeTab.id, { type: 'SCRAPE_JOB_PAGE' })
+                }
+              } catch (injectErr) {
+                console.warn('[Background] Dynamic script injection attempt failed:', injectErr)
+              }
+            }
+            throw tabErr
+          }
         }
 
         case 'SEND_GMAIL_REQUEST': {

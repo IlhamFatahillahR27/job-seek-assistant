@@ -82,6 +82,7 @@ export interface GeminiModelInfo {
   displayName: string
   description?: string
   supportedGenerationMethods: string[]
+  isThinking?: boolean
 }
 
 /**

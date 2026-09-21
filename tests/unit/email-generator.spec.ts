@@ -29,7 +29,7 @@ const mockJobEnglish: JobDetails = {
   extractedAt: new Date().toISOString(),
 }
 
-const mockCvText = `ILHAM FATAHILLAH
+const mockCvText = `Test User
 Senior Frontend Engineer & Web Architect
 Keahlian: Vue.js 3, TypeScript, Tailwind CSS, Vite, Vitest.
 Pengalaman:
@@ -94,8 +94,8 @@ describe('EmailGeneratorService Unit Tests', () => {
   })
 
   it('should handle mock refinement instructions (Iterative Refinement)', () => {
-    const initialSubject = 'Lamaran Posisi Senior Frontend Engineer - Ilham'
-    const initialBody = 'Yth. Tim Rekrutmen,\n\nSaya ingin melamar posisi ini.\n\nHormat saya,\nIlham'
+    const initialSubject = 'Lamaran Posisi Senior Frontend Engineer - Test User'
+    const initialBody = 'Yth. Tim Rekrutmen,\n\nSaya ingin melamar posisi ini.\n\nHormat saya,\nTest User'
 
     // Test tone refinement
     const friendlyResult = EmailGeneratorService.refineMockDraft(

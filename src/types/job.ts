@@ -19,6 +19,8 @@ export interface JobDetails {
   platform: JobPlatform
   extractedAt: string
   rawHtml?: string
+  rawPageText?: string
+  extractionMethod?: 'dom' | 'ai'
 }
 
 export interface JobExtractionStatus {

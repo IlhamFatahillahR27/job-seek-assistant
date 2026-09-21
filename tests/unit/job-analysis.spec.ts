@@ -14,10 +14,10 @@ describe('useJobAnalysis Composable Unit Tests', () => {
 
   const mockCV: CVProfile = {
     id: 'cv-1',
-    fileName: 'Ilham_CV.pdf',
+    fileName: 'Test_User_CV.pdf',
     source: 'manual_paste',
     parsedAt: new Date().toISOString(),
-    rawText: 'Ilham Fatahillah - Senior Software Engineer dengan keahlian Vue 3 dan TypeScript.',
+    rawText: 'Test User - Senior Software Engineer dengan keahlian Vue 3 dan TypeScript.',
     skills: [],
     experiences: [],
     educations: [],

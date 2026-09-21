@@ -9,6 +9,9 @@ import {
   LINKEDIN_DOM_FIXTURE,
   GLINTS_DOM_FIXTURE,
   JOBSTREET_DOM_FIXTURE,
+  JOBSTREET_SEEK_DOM_FIXTURE,
+  JOBSTREET_SPLIT_VIEW_FIXTURE,
+  JOBSTREET_STATE_SCRIPT_FIXTURE,
   INDEED_DOM_FIXTURE,
   UNIVERSAL_CAREER_DOM_FIXTURE,
   PROMPT_INJECTION_DOM_FIXTURE,
@@ -76,10 +79,12 @@ describe('Job Scrapers Unit Tests', () => {
 
     it('should match valid Jobstreet / SEEK URLs', () => {
       expect(scraper.matches('https://www.jobstreet.co.id/job/12345')).toBe(true)
+      expect(scraper.matches('https://www.jobstreet.co.id/id/jobs/12345')).toBe(true)
+      expect(scraper.matches('https://id.jobstreet.com/job/12345')).toBe(true)
       expect(scraper.matches('https://www.seek.com.au/job/67890')).toBe(true)
     })
 
-    it('should correctly extract job details from Jobstreet DOM fixture', () => {
+    it('should correctly extract job details from Jobstreet DOM fixture (classic layout)', () => {
       const doc = createDocFromHtml(JOBSTREET_DOM_FIXTURE)
       const url = 'https://www.jobstreet.co.id/job/12345'
       const result = scraper.extract(doc, url)
@@ -91,6 +96,53 @@ describe('Job Scrapers Unit Tests', () => {
       expect(result?.recruiterEmail).toBe('hr@megacloud.id')
       expect(result?.description).toContain('Kami mencari DevOps Engineer')
       expect(result?.requirements).toContain('Kubernetes, Docker, CI/CD')
+      expect(result?.platform).toBe('jobstreet')
+    })
+
+    it('should correctly extract job details from modern SEEK layout (jobAdDetails & highlights)', () => {
+      const doc = createDocFromHtml(JOBSTREET_SEEK_DOM_FIXTURE)
+      const url = 'https://www.jobstreet.co.id/id/job/789012'
+      const result = scraper.extract(doc, url)
+
+      expect(result).not.toBeNull()
+      expect(result?.title).toBe('Senior Frontend Engineer')
+      expect(result?.company).toBe('PT Solusi Digital Asia')
+      expect(result?.location).toContain('Surabaya')
+      expect(result?.recruiterEmail).toBe('recruitment@solusidigital.id')
+      // Must include highlights and job ad details
+      expect(result?.description).toContain('Poin Utama & Keuntungan')
+      expect(result?.description).toContain('Tunjangan kesehatan lengkap')
+      expect(result?.description).toContain('PT Solusi Digital Asia membuka kesempatan karir')
+      expect(result?.requirements).toContain('Vue.js')
+      expect(result?.platform).toBe('jobstreet')
+    })
+
+    it('should correctly extract job details from split-view layout (jobDetailsPage pane)', () => {
+      const doc = createDocFromHtml(JOBSTREET_SPLIT_VIEW_FIXTURE)
+      const url = 'https://www.jobstreet.co.id/id/jobs?jobId=55555'
+      const result = scraper.extract(doc, url)
+
+      expect(result).not.toBeNull()
+      expect(result?.title).toBe('Full Stack Developer')
+      expect(result?.company).toBe('Nusantara Software House')
+      expect(result?.location).toContain('Surabaya')
+      expect(result?.description).toContain('Kami mencari Full Stack Developer')
+      expect(result?.requirements).toContain('Laravel')
+      expect(result?.platform).toBe('jobstreet')
+    })
+
+    it('should correctly extract job details from SEEK Redux/Apollo script state (Tier 1)', () => {
+      const doc = createDocFromHtml(JOBSTREET_STATE_SCRIPT_FIXTURE)
+      const url = 'https://id.jobstreet.com/id/jobs?daterange=1&jobId=94767759&type=standard'
+      const result = scraper.extract(doc, url)
+
+      expect(result).not.toBeNull()
+      expect(result?.title).toBe('Senior Web Developer & SEO Strategist')
+      expect(result?.company).toBe('PT RADITYA ANUGERAH MEDIKA')
+      expect(result?.location).toContain('Bali')
+      expect(result?.description).toContain('Senior Web Developer & SEO Strategist in Bali')
+      expect(result?.description).toContain('Lead SEO strategy across brands')
+      expect(result?.requirements).toContain('web development and SEO')
       expect(result?.platform).toBe('jobstreet')
     })
   })

@@ -138,10 +138,10 @@ Cakupan pengujian:
 | No | Skenario Pengujian | Tindakan Penguji | Hasil yang Diharapkan |
 |---|---|---|---|
 | 1 | **Verifikasi Build Ekstensi** | Jalankan `npm run build`, muat folder `dist/` di `chrome://extensions/` | Ekstensi termuat tanpa badge error merah; izin `identity` dan `storage` terdaftar. |
-| 2 | **Aktivasi Mode Simulasi (Demo)** | Buka Side Panel -> Tab **Pengaturan** -> Buka *Opsi Pengembang* -> Aktifkan *Mode Simulasi Google Drive (Demo)* | Akun demo `pelamar.kerja@gmail.com` langsung terhubung; badge header berubah menjadi hijau "Google". |
+| 2 | **Aktivasi Mode Simulasi (Demo)** | Buka Side Panel -> Tab **Pengaturan** -> Buka *Opsi Pengembang* -> Aktifkan *Mode Simulasi Google Drive (Demo)* | Akun demo `test.user@example.com` langsung terhubung; badge header berubah menjadi hijau "Google". |
 | 3 | **Pemilihan CV dari Google Drive** | Buka Tab **Profil & CV** -> Klik tombol **Pilih CV dari Google Drive** | Modal terbuka menampilkan daftar berkas CV demo (PDF dan Google Docs) terurut tanggal terbaru. |
 | 4 | **Pencarian Berkas di Drive** | Masukkan kata kunci pencarian (misal: "Resume") pada kotak pencarian modal Drive | Daftar berkas tersaring secara instan sesuai kata kunci yang dimasukkan. |
-| 5 | **Impor & Parsing Berkas CV** | Klik tombol **Pilih** pada salah satu berkas (misal: `Ilham_Fatahillah_Resume_2026.pdf`) | Indikator proses muncul; modal tertutup; kartu status CV aktif menampilkan judul berkas, badge "Google Drive", puluhan keahlian terdeteksi, dan cuplikan pengalaman. Badge header menampilkan "CV Ada". |
+| 5 | **Impor & Parsing Berkas CV** | Klik tombol **Pilih** pada salah satu berkas (misal: `Test_User_Resume_2026.pdf`) | Indikator proses muncul; modal tertutup; kartu status CV aktif menampilkan judul berkas, badge "Google Drive", puluhan keahlian terdeteksi, dan cuplikan pengalaman. Badge header menampilkan "CV Ada". |
 | 6 | **Pemeriksaan Pembaruan & Sync CV** | Klik tombol **Periksa & Sync CV** pada kartu CV aktif | Ikon berputar; sistem membandingkan timestamp dan menampilkan notifikasi "CV di memori lokal sudah menggunakan versi terbaru". |
 | 7 | **Logout Akun Google** | Buka Tab **Pengaturan** -> Klik tombol **Putuskan Koneksi Google** | Status berubah menjadi "Belum Terhubung", info profil dibersihkan, dan badge header menampilkan "No Sync". |
 | 8 | **Input CV Manual (Fallback)** | Di Tab **Profil & CV**, klik **Input / Paste CV Manual**, isi form, lalu klik simpan | CV manual tersimpan dengan badge hijau "Input Manual" tanpa terpengaruh status Google Drive. |

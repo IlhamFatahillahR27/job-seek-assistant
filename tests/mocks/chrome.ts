@@ -120,10 +120,17 @@ export function setupChromeMock() {
         addListener: vi.fn(),
       },
       sendMessage: vi.fn(),
+      getManifest: vi.fn(() => ({
+        version: '1.0.1',
+        content_scripts: [{ js: ['assets/main.ts.js'] }],
+      })),
       onMessage: {
         addListener: vi.fn(),
         removeListener: vi.fn(),
       },
+    },
+    scripting: {
+      executeScript: vi.fn().mockResolvedValue([]),
     },
     sidePanel: {
       setPanelBehavior: vi.fn().mockResolvedValue(undefined),

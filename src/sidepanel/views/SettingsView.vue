@@ -300,14 +300,14 @@ const handleClearAllStorage = async () => {
 
       <div>
         <div class="flex items-center justify-between mb-1">
-          <label class="text-[11px] font-medium text-gray-700 dark:text-gray-300">
-            Model Gemini (ListModels)
+          <label class="text-[11px] font-medium text-gray-700 dark:text-gray-300 flex items-center space-x-1">
+            <span>Model Penalaran Logis (Logical Thinking)</span>
           </label>
           <span
             v-if="availableModelsList.length > 0"
             class="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium"
           >
-            {{ availableModelsList.length }} model tersedia
+            {{ availableModelsList.length }} model aktif
           </span>
         </div>
 
@@ -322,20 +322,22 @@ const handleClearAllStorage = async () => {
               :key="m.id"
               :value="m.id"
             >
-              {{ m.displayName && m.displayName !== m.id ? `${m.displayName} (${m.id})` : m.id }}
+              {{ m.isThinking ? '🧠 ' : '' }}{{ m.displayName && m.displayName !== m.id ? `${m.displayName} (${m.id})` : m.id }}{{ m.isThinking ? ' [Thinking]' : '' }}
             </option>
           </template>
 
           <!-- Fallback options if ListModels has not been fetched yet -->
           <template v-else>
             <option value="gemini-2.0-flash">Gemini 2.0 Flash (Direkomendasikan)</option>
+            <option value="gemini-2.0-flash-thinking-exp">🧠 Gemini 2.0 Flash Thinking (Penalaran Logis)</option>
             <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-            <option value="gemini-1.5-flash-latest">Gemini 1.5 Flash (Latest)</option>
+            <option value="gemini-2.5-pro">Gemini 2.5 Pro (Penalaran Kompleks)</option>
             <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+            <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
           </template>
         </select>
         <p class="mt-1 text-[10px] text-gray-500 dark:text-gray-400">
-          Model diverifikasi langsung dari <code>ModelService.ListModels</code> Google AI Studio.
+          Khusus model text & penalaran logis Gemini (model gambar/video/audio otomatis disaring).
         </p>
       </div>
 

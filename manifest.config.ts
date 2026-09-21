@@ -28,6 +28,7 @@ export default defineManifest({
     'storage',
     'activeTab',
     'identity',
+    'scripting',
   ],
   host_permissions: [
     'https://generativelanguage.googleapis.com/*',

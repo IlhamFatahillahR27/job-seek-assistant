@@ -1,6 +1,5 @@
 import type { JobScraper, ScrapeResult } from './types'
-import { queryText, processScrapedContent } from './utils'
-import { cleanDomElement } from '@/utils/sanitizer'
+import { queryText, processScrapedContent, domToFormattedText } from './utils'
 
 export class GlintsScraper implements JobScraper {
   readonly platform = 'glints' as const
@@ -50,9 +49,7 @@ export class GlintsScraper implements JobScraper {
 
     let rawDesc = ''
     if (descContainers.length > 0) {
-      const cloned = descContainers[0].cloneNode(true) as Element
-      cleanDomElement(cloned)
-      rawDesc = cloned.textContent || ''
+      rawDesc = domToFormattedText(descContainers[0])
     }
 
     // Glints sometimes has a separate skills list

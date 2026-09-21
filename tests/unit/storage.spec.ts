@@ -18,7 +18,7 @@ describe('StorageService (with Chrome Extension Mock)', () => {
   it('should set and retrieve a complex typed object (CVProfile)', async () => {
     const mockCV: CVProfile = {
       id: 'cv_test_1',
-      fileName: 'Ilham_Resume.pdf',
+      fileName: 'Test_User_Resume.pdf',
       source: 'manual_paste',
       parsedAt: '2026-09-18T10:00:00Z',
       rawText: 'Experienced Senior Engineer in TypeScript and Vue 3.',
@@ -31,7 +31,7 @@ describe('StorageService (with Chrome Extension Mock)', () => {
     const retrieved = await storageService.get<CVProfile | null>(STORAGE_KEYS.CV_PROFILE, null)
 
     expect(retrieved).not.toBeNull()
-    expect(retrieved?.fileName).toBe('Ilham_Resume.pdf')
+    expect(retrieved?.fileName).toBe('Test_User_Resume.pdf')
     expect(retrieved?.skills[0].items).toContain('Vue 3')
   })
 

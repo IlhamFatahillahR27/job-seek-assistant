@@ -35,7 +35,7 @@ export class GoogleDriveError extends Error {
 export const DEMO_DRIVE_FILES: GoogleDriveFileItem[] = [
   {
     id: 'demo_drive_file_001',
-    name: 'Ilham_Fatahillah_Resume_2026.pdf',
+    name: 'Test_User_Resume_2026.pdf',
     mimeType: 'application/pdf',
     modifiedTime: new Date(Date.now() - 3600000 * 24 * 2).toISOString(), // 2 days ago
     size: '142850',
@@ -59,9 +59,9 @@ export const DEMO_DRIVE_FILES: GoogleDriveFileItem[] = [
   },
 ]
 
-export const DEMO_DOC_TEXT = `ILHAM FATAHILLAH
+export const DEMO_DOC_TEXT = `Test User
 Senior Frontend Engineer & Web Architect
-Jakarta, Indonesia | ilham.fatahillah@email.com | +62 812-3456-7890 | linkedin.com/in/ilhamfatahillah
+Jakarta, Indonesia | test.user@example.com | +62 812-0000-0000 | linkedin.com/in/testuser-demo
 
 RINGKASAN PROFESIONAL
 Senior Frontend Engineer dengan lebih dari 5 tahun pengalaman dalam membangun aplikasi web modern berskala besar, sistem desain, dan ekstensi peramban. Sangat mahir dalam arsitektur Vue 3, TypeScript, Tailwind CSS, Vite, dan optimasi performa web serta integrasi AI APIs.

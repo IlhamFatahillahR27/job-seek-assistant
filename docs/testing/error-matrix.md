@@ -60,7 +60,7 @@ Untuk memfasilitasi pengujian tanpa ketergantungan pada kredensial Google Cloud 
 
 | Fitur | Perilaku Mode Nyata (*Production*) | Perilaku Mode Simulasi (*Demo Mode*) |
 | :--- | :--- | :--- |
-| **Otentikasi Google** | Menjalankan OAuth2 `launchWebAuthFlow` ke Google Accounts | Memberikan profil mock instan: `Ilham Fatahillah (Demo)` |
+| **Otentikasi Google** | Menjalankan OAuth2 `launchWebAuthFlow` ke Google Accounts | Memberikan profil mock instan: `Test User (Demo)` |
 | **Google Drive CV** | Mengambil berkas PDF / Docs langsung dari Google Drive v3 | Menyediakan 3 pilihan berkas CV mock siap pakai dengan ekstraksi instan |
 | **Gemini AI Match** | Memanggil endpoint Google Generative Language v1beta | Menghasilkan skor kecocokan realistis (~85%), matched skills, dan interview tips terukur |
 | **Email Generator** | Mengirimkan prompt kontekstual ke LLM Gemini | Menghasilkan 3 variasi draf (Formal, Impact, Concise) dengan multi-bahasa instan |

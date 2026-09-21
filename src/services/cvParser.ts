@@ -12,6 +12,27 @@ import type {
   CVEducation,
 } from '@/types/cv'
 
+// TC39 Polyfills required by modern PDF.js (v6+) across all browser and test environments
+if (typeof (Uint8Array.prototype as any).toHex !== 'function') {
+  ;(Uint8Array.prototype as any).toHex = function (): string {
+    let hex = ''
+    for (let i = 0; i < this.length; i++) {
+      hex += this[i].toString(16).padStart(2, '0')
+    }
+    return hex
+  }
+}
+
+if (typeof (Math as any).sumPrecise !== 'function') {
+  ;(Math as any).sumPrecise = function (items: Iterable<number>): number {
+    let sum = 0
+    for (const n of items) {
+      sum += Number(n) || 0
+    }
+    return sum
+  }
+}
+
 // Common Skill Taxonomy for intelligent heuristic categorization
 const SKILL_TAXONOMY: Record<string, string[]> = {
   'Frontend & UI': [
@@ -35,6 +56,8 @@ const SKILL_TAXONOMY: Record<string, string[]> = {
     'Svelte',
     'Pinia',
     'Redux',
+    'Figma',
+    'UI/UX',
     'Responsive Design',
     'Web Accessibility',
   ],
@@ -43,6 +66,7 @@ const SKILL_TAXONOMY: Record<string, string[]> = {
     'Express.js',
     'Express',
     'NestJS',
+    'Nest.js',
     'Python',
     'Django',
     'FastAPI',
@@ -69,6 +93,8 @@ const SKILL_TAXONOMY: Record<string, string[]> = {
     'Firebase',
     'Elasticsearch',
     'DynamoDB',
+    'SQL',
+    'ERD',
   ],
   'Cloud, DevOps & Tooling': [
     'Google Cloud Platform',
@@ -95,6 +121,7 @@ const SKILL_TAXONOMY: Record<string, string[]> = {
     'Integration Testing',
     'TDD',
     'E2E Testing',
+    'Automated UI Testing',
   ],
   'Leadership & Methodologies': [
     'Agile',
@@ -104,6 +131,9 @@ const SKILL_TAXONOMY: Record<string, string[]> = {
     'Mentoring',
     'Sprint Planning',
     'Cross-functional Collaboration',
+    'System Analyst',
+    'Requirement Engineering',
+    'BPMN',
   ],
 }
 
@@ -112,8 +142,27 @@ export class CVParserService {
    * Extract plain text from PDF ArrayBuffer using pdfjs-dist with fallback
    */
   static async extractTextFromPdf(data: ArrayBuffer | Uint8Array): Promise<string> {
-    // Preserve an intact copy because PDF.js may transfer/detach ArrayBuffer internally
-    const rawBytes = data instanceof Uint8Array ? data.slice() : new Uint8Array(data).slice()
+    // Ensure data is converted to an isolated, pure ArrayBuffer & Uint8Array (PDF.js rejects Node Buffers)
+    let rawBytes: Uint8Array
+    try {
+      if (data instanceof Uint8Array) {
+        const ab = new ArrayBuffer(data.byteLength)
+        rawBytes = new Uint8Array(ab)
+        rawBytes.set(data)
+      } else if (data instanceof ArrayBuffer) {
+        const ab = new ArrayBuffer(data.byteLength)
+        rawBytes = new Uint8Array(ab)
+        rawBytes.set(new Uint8Array(data))
+      } else {
+        const anyData = data as any
+        const byteLen = anyData?.byteLength || anyData?.length || 0
+        const ab = new ArrayBuffer(byteLen)
+        rawBytes = new Uint8Array(ab)
+        if (anyData) rawBytes.set(new Uint8Array(anyData))
+      }
+    } catch {
+      rawBytes = new Uint8Array(data as any)
+    }
 
     try {
       // In web extension environment, configure worker from extension assets if available
@@ -129,8 +178,11 @@ export class CVParserService {
         }
       }
 
-      // Clone a copy for PDF.js so rawBytes remains intact if PDF.js transfers the buffer
-      const pdfData = rawBytes.slice()
+      // Clone a clean copy for PDF.js getDocument
+      const ab = new ArrayBuffer(rawBytes.byteLength)
+      const pdfData = new Uint8Array(ab)
+      pdfData.set(rawBytes)
+
       const loadingTask = pdfjsLib.getDocument({
         data: pdfData,
         useWorkerFetch: false,
@@ -271,19 +323,26 @@ export class CVParserService {
     if (!lines.length) return 'Software Engineer'
 
     // First line is often name; second or third is often title/headline
-    for (let i = 0; i < Math.min(lines.length, 5); i++) {
+    for (let i = 0; i < Math.min(lines.length, 6); i++) {
       const line = lines[i]
       if (
         /engineer|developer|architect|designer|manager|lead|specialist|analyst|programmer/i.test(
           line
         ) &&
-        line.length < 80
+        line.length < 120
       ) {
-        return line
+        // Strip trailing location or contact info separated by | or •
+        const parts = line.split(/[|•]/)
+        const rolePart = parts[0]?.trim()
+        if (rolePart && rolePart.length > 3) {
+          return rolePart
+        }
+        return line.trim()
       }
     }
 
-    return lines[1] && lines[1].length < 80 ? lines[1] : 'Profesional / Pelamar Kerja'
+    const fallback = lines[1] && lines[1].length < 80 ? lines[1].split(/[|•]/)[0]?.trim() : ''
+    return fallback || 'Profesional / Pelamar Kerja'
   }
 
   /**
@@ -331,41 +390,69 @@ export class CVParserService {
    */
   private static extractExperiences(text: string): CVExperience[] {
     const experiences: CVExperience[] = []
-    const lines = text.split('\n').map((l) => l.trim())
+    const lines = text.split('\n').map((l) => l.trim()).filter(Boolean)
 
-    // Date range pattern e.g. "2022 - Sekarang", "Jan 2020 - Dec 2021", "2019 - 2022"
+    // Date range pattern e.g. "2022 - Sekarang", "Jan 2020 - Dec 2021", "Jan 2022 - Apr 2023", "2019 - 2022"
     const dateRegex =
-      /((?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember)?\s*\b(?:19|20)\d{2}\b)\s*[-–—to]\s*(\b(?:19|20)\d{2}\b|present|sekarang|current)/i
+      /((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec|januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember)?\s*\b(?:19|20)\d{2}\b)\s*[-–—to]\s*((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec|januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember)?\s*\b(?:19|20)\d{2}\b|present|sekarang|current)/i
+
+    let inExpSection = false
+    let passedExpSection = false
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]
-      const dateMatch = line.match(dateRegex)
+      const lower = line.toLowerCase()
 
+      if (/^(?:professional experience|work experience|pengalaman kerja|pengalaman profesional)\b/i.test(lower)) {
+        inExpSection = true
+        continue
+      }
+
+      if (inExpSection && /^(?:education|pendidikan|areas of expertise|technical proficiencies|keahlian|sertifikasi|certifications?|training|pelatihan)\b/i.test(lower)) {
+        passedExpSection = true
+        break
+      }
+
+      const dateMatch = line.match(dateRegex)
       if (dateMatch) {
+        if (passedExpSection) break
+
         const startDate = dateMatch[1].trim()
         const endDate = dateMatch[2].trim()
 
-        // The line itself or previous line usually contains role and company
         let role = 'Software Engineer'
         let company = 'Perusahaan'
 
+        const textBeforeDate = line.substring(0, line.indexOf(dateMatch[0])).trim()
         const prevLine = lines[i - 1] || ''
-        const candidateLine = prevLine.length > 2 && prevLine.length < 90 ? prevLine : line
 
-        const parts = candidateLine.split(/[|•–—,-]/)
-        if (parts.length >= 2) {
-          role = parts[0].replace(dateRegex, '').trim()
-          company = parts[1].replace(dateRegex, '').trim()
-        } else if (candidateLine.trim()) {
-          role = candidateLine.replace(dateRegex, '').trim()
+        if (textBeforeDate.length > 2) {
+          // e.g. "Full Stack Engineer Jan 2023 - Present"
+          role = textBeforeDate.replace(/[|•–—,-]/g, ' ').trim()
+          if (prevLine && prevLine.length > 2 && prevLine.length < 80) {
+            // prevLine e.g. "Universitas Dinamika  Surabaya, Indonesia"
+            const compParts = prevLine.split(/\s{2,}|[,|•]/)
+            company = compParts[0]?.trim() || prevLine.trim()
+          }
+        } else {
+          // Date is on standalone line, candidateLine is prevLine
+          const candidateLine = prevLine.length > 2 && prevLine.length < 90 ? prevLine : line
+          const parts = candidateLine.split(/[|•–—,-]/)
+          if (parts.length >= 2) {
+            role = parts[0].replace(dateRegex, '').trim()
+            company = parts[1].replace(dateRegex, '').trim()
+          } else if (candidateLine.trim()) {
+            role = candidateLine.replace(dateRegex, '').trim()
+          }
         }
 
         // Collect description sentences that follow
         const descLines: string[] = []
-        for (let j = i + 1; j < Math.min(lines.length, i + 6); j++) {
+        for (let j = i + 1; j < Math.min(lines.length, i + 8); j++) {
           if (lines[j].match(dateRegex)) break
+          if (/^(?:professional experience|work experience|pengalaman|education|pendidikan|areas of expertise|technical proficiencies)\b/i.test(lines[j])) break
           if (lines[j].length > 5) {
-            descLines.push(lines[j].replace(/^[-*•]\s*/, ''))
+            descLines.push(lines[j].replace(/^[-*•]\s*/, '').trim())
           }
         }
 
@@ -376,10 +463,10 @@ export class CVParserService {
           startDate,
           endDate,
           description: descLines.slice(0, 2).join(' '),
-          keyAchievements: descLines.slice(0, 3),
+          keyAchievements: descLines.slice(0, 4),
         })
 
-        if (experiences.length >= 4) break
+        if (experiences.length >= 5) break
       }
     }
 
@@ -391,7 +478,7 @@ export class CVParserService {
    */
   private static extractEducations(text: string): CVEducation[] {
     const educations: CVEducation[] = []
-    const lines = text.split('\n').map((l) => l.trim())
+    const lines = text.split('\n').map((l) => l.trim()).filter(Boolean)
 
     const degreeRegex =
       /\b(bachelor|master|doctor|sarjana|magister|diploma|s\.kom|s\.t|b\.sc|m\.sc|ph\.d|d3|d4|s1|s2)\b/i
@@ -400,10 +487,15 @@ export class CVParserService {
       const line = lines[i]
       if (degreeRegex.test(line)) {
         let institution = 'Universitas'
+        const prevLine = lines[i - 1] || ''
         const nextLine = lines[i + 1] || ''
 
-        if (/universitas|institute|university|politeknik|college|sekolah/i.test(nextLine)) {
-          institution = nextLine
+        if (/universitas|institute|university|politeknik|college|sekolah|academy/i.test(prevLine)) {
+          const compParts = prevLine.split(/\s{2,}|[,|•]/)
+          institution = compParts[0]?.trim() || prevLine.trim()
+        } else if (/universitas|institute|university|politeknik|college|sekolah|academy/i.test(nextLine)) {
+          const compParts = nextLine.split(/\s{2,}|[,|•]/)
+          institution = compParts[0]?.trim() || nextLine.trim()
         } else if (/universitas|institute|university|politeknik|college/i.test(line)) {
           const parts = line.split(/[|–—,-]/)
           if (parts.length > 1) {
@@ -411,11 +503,13 @@ export class CVParserService {
           }
         }
 
-        const yearMatch = (line + ' ' + nextLine).match(/\b(19|20)\d{2}\b/)
+        const dateRangeRegex = /\b(?:19|20)\d{2}\s*[-–—to]\s*(?:\b(?:19|20)\d{2}\b|present|sekarang|current)?/i
+        const yearMatch = (line + ' ' + nextLine).match(dateRangeRegex) || (line + ' ' + nextLine).match(/\b(19|20)\d{2}\b/)
+        const cleanDegree = line.replace(dateRangeRegex, '').replace(/^[-*•]\s*/, '').trim()
 
         educations.push({
           id: `edu_${educations.length + 1}`,
-          degree: line.substring(0, 60),
+          degree: cleanDegree.substring(0, 60),
           institution: institution.substring(0, 70),
           graduationYear: yearMatch ? yearMatch[0] : undefined,
         })
@@ -432,20 +526,21 @@ export class CVParserService {
    */
   private static extractCertifications(text: string): string[] {
     const certs: string[] = []
-    const lines = text.split('\n').map((l) => l.trim())
+    const lines = text.split('\n').map((l) => l.trim()).filter(Boolean)
 
     let inCertSection = false
-    for (const line of lines) {
-      if (/sertifikasi|certifications?|licens(e|es)/i.test(line) && line.length < 35) {
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]
+      if (/(?:professional\s+)?training|pelatihan|sertifikasi|certifications?|licens(e|es)|courses?|kursus/i.test(line) && line.length < 50) {
         inCertSection = true
         continue
       }
       if (inCertSection) {
-        if (/pengalaman|pendidikan|keahlian|experience|education|skills/i.test(line)) {
+        if (/^(?:pengalaman|pendidikan|keahlian|experience|education|skills|areas of expertise)\b/i.test(line)) {
           break
         }
-        if (line.length > 3 && line.length < 80) {
-          certs.push(line.replace(/^[-*•]\s*/, ''))
+        if (line.length > 5 && line.length < 120 && !line.startsWith('http')) {
+          certs.push(line.replace(/^[-*•]\s*/, '').trim())
         }
       }
     }

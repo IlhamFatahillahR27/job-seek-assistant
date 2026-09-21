@@ -74,6 +74,31 @@ SKEMA JSON OUTPUT:
 }`
 
   /**
+   * System Prompt strictly adhering to factual job vacancy extraction from page content
+   */
+  private static SYSTEM_PROMPT_JOB_EXTRACTION = `Anda adalah "AI Job Vacancy Extractor" yang objektif, teliti, dan berbasis fakta. Tugas Anda adalah membaca teks mentah halaman web lowongan kerja (<webpage_content>) dan mengekstrak rincian pekerjaan secara lengkap dan akurat ke dalam format JSON.
+
+ATURAN UTAMA:
+1. HANYA ekstrak fakta yang benar-benar tercantum di dalam teks halaman. DILARANG KERAS mengarang, menyimpulkan asumsi, atau menambahkan informasi yang tidak tertulis.
+2. Jika halaman memuat beberapa lowongan (misalnya daftar lowongan di kolom samping dan panel rincian di kolom utama), fokuslah secara eksklusif pada lowongan kerja yang sedang aktif ditampilkan di panel rincian.
+3. Ekstrak bagian tanggung jawab, tugas harian, dan ringkasan peran secara lengkap (jangan diringkas berlebihan) ke dalam properti "description".
+4. Ekstrak kualifikasi, keahlian teknis, dan syarat pengalaman ke dalam properti "requirements".
+5. Tentukan "workplaceType": "Remote" | "Hybrid" | "On-site" | "Unspecified".
+6. Ambil email kontak HR/perekrut jika tercantum ke dalam "recruiterEmail" (kosongkan string "" jika tidak ada).
+7. Output WAJIB dalam format JSON murni tanpa tanda petik markdown pengantar.
+
+SKEMA JSON OUTPUT:
+{
+  "title": string,
+  "company": string,
+  "location": string,
+  "workplaceType": "Remote" | "Hybrid" | "On-site" | "Unspecified",
+  "description": string,
+  "requirements": string,
+  "recruiterEmail": string
+}`
+
+  /**
    * Query ModelService.ListModels to fetch available models supporting generateContent
    */
   static async listModels(apiKey: string): Promise<GeminiModelInfo[]> {
@@ -129,38 +154,57 @@ SKEMA JSON OUTPUT:
             ? m.supportedGenerationMethods
             : []
 
-          // Check if model supports content generation
+          // Only allow Gemini series models that support content generation & logical reasoning
+          const isGeminiModel = id.startsWith('gemini-') || rawName.startsWith('models/gemini-')
           const supportsGenerate =
             supported.includes('generateContent') ||
-            (supported.length === 0 && id.includes('gemini'))
-          const isExcluded =
-            id.includes('embedding') ||
-            id.includes('aqa') ||
-            id.includes('imagen')
+            (supported.length === 0 && isGeminiModel)
 
-          if (supportsGenerate && !isExcluded) {
+          // Strict filter against non-reasoning / multimedia generation (image, video, audio, embeddings)
+          const lowerId = id.toLowerCase()
+          const isExcluded =
+            !isGeminiModel ||
+            !supportsGenerate ||
+            lowerId.includes('imagen') ||
+            lowerId.includes('image') ||
+            lowerId.includes('veo') ||
+            lowerId.includes('video') ||
+            lowerId.includes('embedding') ||
+            lowerId.includes('embed') ||
+            lowerId.includes('aqa') ||
+            lowerId.includes('audio') ||
+            lowerId.includes('speech') ||
+            lowerId.includes('tts') ||
+            lowerId.includes('whisper') ||
+            lowerId.includes('robotics') ||
+            lowerId.includes('computer-use')
+
+          if (!isExcluded) {
+            const isThinking = lowerId.includes('thinking')
             models.push({
               id,
               name: rawName,
               displayName: m.displayName || id,
               description: m.description,
               supportedGenerationMethods: supported,
+              isThinking,
             })
           }
         }
       }
 
-      // Sort models: Flash models first, then Pro models, newest versions first
+      // Sort models: Thinking models & primary reasoning models first, newest versions prioritized
       models.sort((a, b) => {
         const scoreModel = (m: GeminiModelInfo) => {
           let score = 0
-          if (m.id.includes('flash')) score += 100
-          if (m.id.includes('2.5')) score += 40
-          else if (m.id.includes('2.0')) score += 30
-          else if (m.id.includes('1.5')) score += 20
+          if (m.isThinking) score += 200
+          if (m.id.includes('2.5')) score += 60
+          else if (m.id.includes('2.0')) score += 50
+          else if (m.id.includes('1.5')) score += 30
+          if (m.id.includes('flash')) score += 20
+          if (m.id.includes('pro')) score += 35
           if (m.id.includes('latest')) score += 5
-          if (m.id.includes('lite') || m.id.includes('8b')) score -= 10
-          if (m.id.includes('pro')) score += 50
+          if (m.id.includes('lite') || m.id.includes('8b')) score -= 15
           return score
         }
         return scoreModel(b) - scoreModel(a)
@@ -591,6 +635,186 @@ Berikan hasil evaluasi lengkap dalam format JSON yang valid.`
         `Keahlian mendalam dalam teknologi utama (${matched.map((m) => m.skill).slice(0, 3).join(', ')}).`,
         `Komitmen tinggi pada kualitas pengujian otomatis dan performa aplikasi.`,
       ],
+    }
+  }
+
+  /**
+   * Helper to detect platform from vacancy URL
+   */
+  static detectPlatformFromUrl(url: string): 'linkedin' | 'glints' | 'jobstreet' | 'indeed' | 'custom' {
+    const lower = url.toLowerCase()
+    if (lower.includes('linkedin.com')) return 'linkedin'
+    if (lower.includes('glints.com')) return 'glints'
+    if (lower.includes('jobstreet.') || lower.includes('seek.com') || lower.includes('jobsdb.com')) return 'jobstreet'
+    if (lower.includes('indeed.com')) return 'indeed'
+    return 'custom'
+  }
+
+  /**
+   * AI-Powered Job Vacancy Extraction using Gemini
+   * Extracts clean structured job details from raw webpage text.
+   */
+  static async extractJobWithAI(options: {
+    apiKey: string
+    model?: string
+    pageText: string
+    url: string
+    pageTitle?: string
+    forceDemo?: boolean
+  }): Promise<JobDetails> {
+    if (options.forceDemo || !options.apiKey?.trim()) {
+      return this.generateMockJobExtraction(options.pageText, options.url, options.pageTitle)
+    }
+
+    const apiKey = options.apiKey.trim()
+    let model = (options.model || DEFAULT_MODEL).replace(/^models\//, '').trim() || DEFAULT_MODEL
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      throw new GeminiClientError(
+        'Koneksi internet terputus (offline). Tidak dapat memanggil Gemini AI tanpa koneksi internet.',
+        undefined,
+        true
+      )
+    }
+
+    if (!options.pageText || options.pageText.trim().length < 30) {
+      throw new GeminiClientError('Teks halaman web kosong atau terlalu pendek untuk dianalisis oleh AI.')
+    }
+
+    const userPrompt = `<webpage_url>${options.url}</webpage_url>\n<webpage_title>${options.pageTitle || ''}</webpage_title>\n<webpage_content>\n${options.pageText}\n</webpage_content>`
+
+    const payload = {
+      systemInstruction: {
+        parts: [{ text: this.SYSTEM_PROMPT_JOB_EXTRACTION }],
+      },
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: userPrompt }],
+        },
+      ],
+      generationConfig: {
+        temperature: 0.1,
+        topP: 0.95,
+        responseMimeType: 'application/json',
+      },
+    }
+
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+    const url = `${GEMINI_API_BASE}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`
+
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      if (!res.ok) {
+        let errorMsg = `Gemini API Error: HTTP ${res.status}`
+        try {
+          const errData = await res.json()
+          if (errData?.error?.message) {
+            errorMsg = errData.error.message
+          }
+        } catch {
+          // ignore
+        }
+        if (res.status === 429) {
+          throw new GeminiClientError('Batas kuota Gemini API (Rate Limit 429) tercapai. Silakan coba lagi sebentar lagi.', 429)
+        }
+        throw new GeminiClientError(errorMsg, res.status)
+      }
+
+      const data = await res.json()
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text
+      if (!text) {
+        throw new GeminiClientError('Model Gemini tidak mengembalikan respons teks.')
+      }
+
+      let cleaned = text.trim()
+      if (cleaned.startsWith('```')) {
+        cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
+      }
+      const firstBrace = cleaned.indexOf('{')
+      const lastBrace = cleaned.lastIndexOf('}')
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        cleaned = cleaned.substring(firstBrace, lastBrace + 1).trim()
+      }
+
+      const parsed = JSON.parse(cleaned)
+
+      return {
+        id: `job_ai_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        url: options.url,
+        title: parsed.title?.trim() || options.pageTitle || 'Posisi Lowongan',
+        company: parsed.company?.trim() || 'Perusahaan',
+        location: parsed.location?.trim() || 'Lokasi tidak tertera',
+        workplaceType: ['Remote', 'Hybrid', 'On-site', 'Unspecified'].includes(parsed.workplaceType)
+          ? parsed.workplaceType
+          : 'Unspecified',
+        description: parsed.description?.trim() || 'Deskripsi tidak tertera',
+        requirements: parsed.requirements?.trim() || '',
+        recruiterEmail: parsed.recruiterEmail?.trim() || '',
+        platform: this.detectPlatformFromUrl(options.url),
+        extractedAt: new Date().toISOString(),
+        rawPageText: options.pageText,
+        extractionMethod: 'ai',
+      }
+    } catch (err: any) {
+      if (err instanceof GeminiClientError) throw err
+      const isTimeout = err.name === 'AbortError'
+      throw new GeminiClientError(
+        isTimeout
+          ? 'Waktu koneksi habis (timeout) saat memanggil Gemini AI untuk ekstraksi halaman.'
+          : (err.message || 'Gagal mengekstrak lowongan dengan Gemini AI.')
+      )
+    }
+  }
+
+  /**
+   * Mock job extraction for Demo Mode and offline testing
+   */
+  static generateMockJobExtraction(pageText: string, url: string, pageTitle?: string): JobDetails {
+    const lines = pageText.split('\n').map((l) => l.trim()).filter((l) => l.length > 0)
+    let title = pageTitle ? pageTitle.split(/[-|–]/)[0].trim() : 'Software Engineer'
+    let company = 'Perusahaan'
+
+    for (const line of lines.slice(0, 10)) {
+      if (/engineer|developer|manager|specialist|analyst|designer|architect|lead/i.test(line) && line.length < 50) {
+        title = line
+        break
+      }
+    }
+
+    for (const line of lines.slice(0, 15)) {
+      if (/PT\s+[A-Z]|Inc|Corp|Ltd|Technologies|Solutions|Asia/i.test(line) && line.length < 50) {
+        company = line
+        break
+      }
+    }
+
+    return {
+      id: `job_mock_${Date.now()}`,
+      url,
+      title,
+      company,
+      location: 'Indonesia',
+      workplaceType: 'Hybrid',
+      description: pageText.slice(0, 500) || 'Deskripsi pekerjaan diekstrak melalui simulasi AI.',
+      requirements: 'Kualifikasi dan keahlian yang relevan dengan posisi kerja.',
+      recruiterEmail: '',
+      platform: this.detectPlatformFromUrl(url),
+      extractedAt: new Date().toISOString(),
+      rawPageText: pageText,
+      extractionMethod: 'ai',
     }
   }
 }

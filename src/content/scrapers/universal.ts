@@ -1,6 +1,5 @@
 import type { JobScraper, ScrapeResult } from './types'
-import { queryText, processScrapedContent } from './utils'
-import { cleanDomElement } from '@/utils/sanitizer'
+import { queryText, processScrapedContent, domToFormattedText } from './utils'
 
 /**
  * Universal Heuristic Scraper
@@ -216,10 +215,7 @@ export class UniversalScraper implements JobScraper {
     ]
 
     for (const candidate of candidates) {
-      const cloned = candidate.cloneNode(true) as Element
-      cleanDomElement(cloned)
-
-      const text = cloned.textContent || ''
+      const text = domToFormattedText(candidate)
       if (text.length < 50) continue
 
       let score = text.length

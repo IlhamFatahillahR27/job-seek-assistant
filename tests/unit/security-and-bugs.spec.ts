@@ -202,7 +202,7 @@ Berikut 3 variasi email lamaran yang telah disusun:
       "id": "formal",
       "title": "Formal & Baku",
       "language": "id",
-      "subject": "Lamaran Software Engineer - Ilham",
+      "subject": "Lamaran Software Engineer - Test User",
       "body": "Yth. Tim Rekrutmen...",
       "highlighted_cv_points": ["Vue 3"]
     }

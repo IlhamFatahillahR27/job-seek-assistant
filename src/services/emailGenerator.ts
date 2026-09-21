@@ -444,7 +444,15 @@ Berikan versi revisi lengkap dalam format JSON valid sesuai skema.`
   ): GeneratedEmailTemplate[] {
     const jobTitle = job.title || 'Senior Frontend Engineer'
     const company = job.company || 'Tech Titan Nusantara'
-    const candidateName = cvText.includes('ILHAM FATAHILLAH') ? 'Ilham Fatahillah' : 'Kandidat'
+    const firstLine = (cvText || '').split('\n').map((l) => l.trim()).find((l) => l.length > 0) || ''
+    const candidateName =
+      firstLine &&
+      !firstLine.includes('@') &&
+      !firstLine.includes('http') &&
+      !firstLine.includes('+') &&
+      firstLine.length < 50
+        ? firstLine
+        : 'Test User'
 
     if (lang === 'en') {
       const formalBody = `Dear Hiring Team at ${company},
@@ -595,17 +603,19 @@ ${candidateName}`
     missingSkills?: string[]
   ): EmailRefinementResult {
     const lowerFb = feedback.toLowerCase()
+    const matchName = currentBody.match(/(?:Warm regards|Best regards|Hormat saya|Salam hangat|Salam)[\s,]*\n+([^\n]+)$/i)
+    const candidateName = matchName ? matchName[1].trim() : 'Test User'
     let revisedSubject = currentSubject
     let revisedBody = currentBody
     let summary = 'Draf email telah diperbarui berdasarkan masukan Anda.'
 
     if (lowerFb.includes('inggris') || lowerFb.includes('english') || lowerFb.includes('translate to en')) {
       revisedSubject = currentSubject.replace('Lamaran Posisi', 'Application for').replace('Aplikasi', 'Application:')
-      revisedBody = `Dear Hiring Team,\n\nI am writing to express my interest in this position. Based on my technical experience in scalable frontend architecture, Vue 3, and TypeScript, I look forward to bringing high-impact contributions to your team.\n\nPlease find my resume attached.\n\nBest regards,\nIlham Fatahillah`
+      revisedBody = `Dear Hiring Team,\n\nI am writing to express my interest in this position. Based on my technical experience in scalable frontend architecture, Vue 3, and TypeScript, I look forward to bringing high-impact contributions to your team.\n\nPlease find my resume attached.\n\nBest regards,\n${candidateName}`
       summary = 'Bahasa email berhasil dialihkan ke Bahasa Inggris profesional.'
     } else if (lowerFb.includes('indonesia') || lowerFb.includes('bahasa indonesia')) {
       revisedSubject = currentSubject.replace('Application for', 'Lamaran Posisi')
-      revisedBody = `Yth. Tim Rekrutmen,\n\nMelalui email ini saya bermaksud mengajukan diri untuk posisi yang sedang dibuka. Berbekal pengalaman dalam arsitektur web modern, Vue 3, dan TypeScript, saya siap memberikan kontribusi optimal bagi tim Anda.\n\nTerlampir CV lengkap saya untuk bahan pertimbangan.\n\nHormat saya,\nIlham Fatahillah`
+      revisedBody = `Yth. Tim Rekrutmen,\n\nMelalui email ini saya bermaksud mengajukan diri untuk posisi yang sedang dibuka. Berbekal pengalaman dalam arsitektur web modern, Vue 3, dan TypeScript, saya siap memberikan kontribusi optimal bagi tim Anda.\n\nTerlampir CV lengkap saya untuk bahan pertimbangan.\n\nHormat saya,\n${candidateName}`
       summary = 'Bahasa email berhasil dialihkan ke Bahasa Indonesia formal.'
     } else if (lowerFb.includes('singkat') || lowerFb.includes('concise') || lowerFb.includes('pendek')) {
       revisedBody = currentBody.split('\n\n').slice(0, 3).join('\n\n') + '\n\nTerima kasih atas perhatiannya.'

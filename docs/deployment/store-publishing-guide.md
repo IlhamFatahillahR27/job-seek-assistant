@@ -25,7 +25,7 @@ npm run build
 ```
 Plugin `vite-plugin-zip-pack` akan secara otomatis memaketkan seluruh isi folder `dist/` ke dalam file siap rilis:
 ```
-release/crx-job-seek-assistant-1.0.0.zip
+release/crx-job-seek-assistant-1.0.1.zip
 ```
 Berkas ZIP di atas **langsung siap diunggah** ke Chrome Web Store dan Microsoft Edge Partner Center.
 
@@ -72,7 +72,7 @@ Jangan pernah menyertakan berkas berikut ke dalam ZIP rilis:
 
 ### Langkah 2: Mengunggah Paket Ekstensi
 1. Pada dashboard Partner Center, klik **"Create new extension"**.
-2. Unggah file ZIP rilis: `release/crx-job-seek-assistant-1.0.0.zip`.
+2. Unggah file ZIP rilis: `release/crx-job-seek-assistant-1.0.1.zip`.
 3. Sistem Microsoft Edge akan secara otomatis memvalidasi `manifest.json`.
 
 ### Langkah 3: Melengkapi Listing Toko (Store Listing)
@@ -103,7 +103,7 @@ Jangan pernah menyertakan berkas berikut ke dalam ZIP rilis:
 
 ### Langkah 2: Mengunggah Paket Ekstensi
 1. Klik tombol **"Add new item"** di pojok kanan atas.
-2. Tarik (*drag & drop*) berkas ZIP: `release/crx-job-seek-assistant-1.0.0.zip`.
+2. Tarik (*drag & drop*) berkas ZIP: `release/crx-job-seek-assistant-1.0.1.zip`.
 3. Tunggu hingga proses verifikasi manifes selesai.
 
 ### Langkah 3: Melengkapi Deskripsi & Metadata Toko
@@ -186,7 +186,7 @@ For any questions regarding this privacy policy, please open an issue on GitHub.
 
 - [ ] Jalankan `npm run test` (pastikan 103 tes lulus 100%).
 - [ ] Jalankan `npm run build` (pastikan *zero errors* dan *zero warnings*).
-- [ ] Berkas `release/crx-job-seek-assistant-1.0.0.zip` telah terbuat.
+- [ ] Berkas `release/crx-job-seek-assistant-1.0.1.zip` telah terbuat.
 - [ ] Periksa isi file zip: pastikan `manifest.json` ada di level akar (*root*).
 - [ ] Siapkan minimal 1 screenshot beresolusi 1280x800 piksel.
 - [ ] Siapkan icon PNG ukuran 128x128 piksel.
