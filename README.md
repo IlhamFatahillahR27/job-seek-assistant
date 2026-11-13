@@ -10,6 +10,11 @@ Job Seek Assistant adalah ekstensi peramban (*browser extension*) Manifest V3 be
 ## ✨ Fitur Utama
 
 - **🖥️ Chrome Side Panel Modern UI**: Antarmuka responsif dan terintegrasi langsung di bilah samping (*side panel*) browser tanpa mengganggu alur penjelajahan.
+- **👋 Welcome / Landing Screen & Onboarding (v1.1.0)**:
+  - Halaman awal terdedikasi saat ekstensi pertama kali dibuka atau setelah sesi demo berakhir.
+  - Membatasi akses tab utama sebelum pengguna masuk dengan akun Google atau memilih Mode Demo.
+  - Dialog modal otomatis konfigurasi Gemini API Key pasca-login dengan tautan instan ke Google AI Studio.
+  - Banner panduan pengisian Profil CV di tab Analisa sebelum memulai ekstraksi lowongan.
 - **📁 Google Drive CV Memory & Synchronizer**:
   - Pemilihan berkas CV langsung dari Google Drive v3 (format **PDF** & **Google Docs**).
   - Ekstraksi teks dokumen otomatis berbasis PDF.js dan export plain text Drive API.
@@ -33,11 +38,12 @@ Job Seek Assistant adalah ekstensi peramban (*browser extension*) Manifest V3 be
   - **Simpan ke Draft**: Membuat draf resmi di kotak masuk Gmail pengguna (`users.me.drafts.create`).
   - **Kirim Email Langsung**: Mengirim email langsung via Gmail API (`users.me.messages.send`) dengan modal konfirmasi ringkasan.
   - Pembentukan payload MIME RFC 2822 base64url terenkapsulasi dengan opsi menyertakan berkas CV PDF asli dari Google Drive sebagai lampiran.
-- **🛡️ Error Resilience & Offline Mode**:
+- **🛡️ Error Resilience, Session Recovery & Anti-Stuck**:
+  - Deteksi otomatis sesi Google OAuth kedaluwarsa dengan auto-redirect ke menu awal dan notifikasi amber informatif.
+  - Validasi proaktif format Client ID di sisi klien (mencegah kekeliruan input API Key `AIza...`).
+  - Pencegahan tombol membeku (*anti-stuck*) dengan tombol pembatalan interaktif (*Cancel*) dan *safety timeout* 45 detik.
   - Banner status offline otomatis di UI saat koneksi internet terputus.
-  - *Silent token refresh* dan *auto-retry* jika sesi Google OAuth kedaluwarsa (HTTP 401).
-  - Deteksi berkas CV terhapus di Drive (HTTP 404) dan batas kuota Gemini API (HTTP 429).
-  - **Mode Simulasi (Demo Mode)** lengkap untuk evaluasi instan tanpa perlu mendaftar GCP atau API key.
+  - **Mode Simulasi (Demo Mode)** lengkap dengan banner status persisten di seluruh tab navigasi dan tombol *"Selesai Demo"*.
 
 ---
 
@@ -96,7 +102,7 @@ npm install
   ```bash
   npm run build
   ```
-  *Hasil build akan tersimpan di direktori `dist/` dan paket zip rilis akan otomatis terbentuk di `release/crx-job-seek-assistant-1.0.0.zip`.*
+  *Hasil build akan tersimpan di direktori `dist/` dan paket zip rilis akan otomatis terbentuk di `release/crx-job-seek-assistant-1.1.0.zip`.*
 
 ### 3. Memasang Ekstensi di Google Chrome
 1. Buka Google Chrome dan ketik `chrome://extensions/` pada bilah alamat.
@@ -117,20 +123,28 @@ npm install
 
 ## ⚙️ Panduan Konfigurasi
 
-Buka tab **Pengaturan** di Side Panel ekstensi:
+### A. Konfigurasi Google Workspace (OAuth 2.0 Client ID)
+1. Buat atau gunakan OAuth 2.0 Client ID bertipe **Web application** di [Google Cloud Console](https://console.cloud.google.com/apis/credentials).
+2. Salin file template `.env.example` menjadi `.env`:
+   ```bash
+   cp .env.example .env
+   ```
+3. Masukkan Client ID Anda ke variabel `VITE_GOOGLE_CLIENT_ID` di dalam `.env`:
+   ```env
+   VITE_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+   ```
+4. Tambahkan *Authorized redirect URIs* ekstensi ke Google Cloud Console:
+   - Dapatkan URI ekstensi dari menu Pengaturan atau `https://<ID-EKSTENSI>.chromiumapp.org/`.
+   - Simpan di Google Cloud Console -> Credentials -> OAuth 2.0 Client ID -> Authorized redirect URIs.
+5. Jalankan `npm run build` — Client ID akan otomatis terpasang aman di dalam sistem tanpa perlu diinput manual oleh pengguna akhir.
+6. *(Alternatif)* Gunakan tombol **"Coba Mode Demo"** pada halaman awal untuk simulasi Google Drive & Gmail tanpa kredensial GCP.
 
-### A. Konfigurasi Google Gemini API
+### B. Konfigurasi Google Gemini API
 1. Buka [Google AI Studio](https://aistudio.google.com/) dan buat API Key baru.
-2. Masukkan API Key pada kolom **Google Gemini API Key**.
-3. Klik tombol **"Uji Koneksi"** untuk memverifikasi keabsahan kunci dan memuat daftar model aktif.
-4. Pilih model yang diinginkan (default: `gemini-2.0-flash` atau `gemini-1.5-flash`).
-5. *(Alternatif)* Centang **"Gunakan Mode Simulasi Gemini (Demo)"** untuk mencoba analisis tanpa API key.
-
-### B. Konfigurasi Google Workspace (Drive & Gmail)
-1. Lihat panduan lengkap pembuatan kredensial di [`docs/setup/google-oauth-setup.md`](docs/setup/google-oauth-setup.md).
-2. Salin *OAuth 2.0 Client ID* dari Google Cloud Console dan tempelkan ke kolom **Google Client ID**.
-3. Klik tombol **"Hubungkan Akun Google"** untuk melakukan login interaktif via Google Accounts.
-4. *(Alternatif)* Centang **"Gunakan Mode Simulasi Google Drive & Gmail (Demo)"** untuk langsung menggunakan berkas CV mock dan simulasi pengiriman email tanpa konfigurasi GCP.
+2. Saat pertama kali login, dialog modal konfigurasi Gemini API Key akan otomatis muncul, atau buka tab **Pengaturan** di Side Panel.
+3. Masukkan API Key pada kolom **Google Gemini API Key** lalu klik **"Uji Koneksi"**.
+4. Pilih model yang diinginkan (default: `gemini-2.0-flash` atau model reasoning `gemini-2.0-flash-thinking-exp`).
+5. *(Alternatif)* Aktifkan **"Mode Simulasi Gemini AI (Demo)"** untuk evaluasi tanpa API key.
 
 ---
 
@@ -139,7 +153,7 @@ Buka tab **Pengaturan** di Side Panel ekstensi:
 | Perintah | Deskripsi |
 | :--- | :--- |
 | `npm run dev` | Menjalankan Vite development server dengan integrasi `@crxjs/vite-plugin`. |
-| `npm run test` | Menjalankan seluruh test suite otomatis menggunakan **Vitest** (16 test suite, 103+ tests). |
+| `npm run test` | Menjalankan seluruh test suite otomatis menggunakan **Vitest** (19 test suite, 133 tests). |
 | `npm run test:watch` | Menjalankan Vitest dalam mode watch interaktif. |
 | `npm run build` | Menjalankan typecheck TypeScript (`vue-tsc -b`) dan memaketkan ekstensi ke folder `dist/` serta membuat file rilis zip di `release/`. |
 
@@ -147,7 +161,9 @@ Buka tab **Pengaturan** di Side Panel ekstensi:
 
 ## 🧪 Rangkaian Pengujian Otomatis (Test Suite)
 
-Proyek ini dilengkapi dengan 16 test suite otomatis yang mencakup 103 unit tests:
+Proyek ini dilengkapi dengan 19 test suite otomatis yang mencakup 133 unit tests (100% passed):
+- `tests/unit/welcome-flow.spec.ts`: Pengujian alur Welcome Screen, siklus hidup Mode Demo, modal API key, panduan onboarding CV, dan deteksi sesi expired.
+- `tests/unit/reference-cv.spec.ts`: Parsing berkas resume/CV referensi nyata ke struktur profil terperinci.
 - `tests/unit/error-resilience.spec.ts`: Pengujian ketahanan offline, silent re-auth 401, error 404, dan limit kuota 429.
 - `tests/unit/cv-parser.spec.ts`: Ekstraksi teks PDF & Docs serta fallback binary extractor.
 - `tests/unit/cv-sync.spec.ts`: Deteksi perubahan berkas Google Drive dan sinkronisasi timestamp.
@@ -159,22 +175,25 @@ Proyek ini dilengkapi dengan 16 test suite otomatis yang mencakup 103 unit tests
 - `tests/unit/email-generator.spec.ts`: Pembuatan draf multi-tone, multi-language, dan revisi iteratif.
 - `tests/unit/mime-builder.spec.ts`: Pembentukan pesan MIME RFC 2822 base64url dengan lampiran PDF.
 - `tests/unit/gmail-client.spec.ts`: Pembuatan draft dan pengiriman langsung via Gmail API.
-- `tests/unit/google-auth.spec.ts`: Otentikasi OAuth2, refresh token, dan penanganan sesi.
+- `tests/unit/google-auth.spec.ts`: Otentikasi OAuth2, refresh token, validasi Client ID, dan penanganan sesi.
 - `tests/unit/storage.spec.ts`: Wrapper reaktif `chrome.storage.local`.
 - `tests/unit/sidepanel-tabs.spec.ts`: Render navigasi tab dan antarmuka Side Panel.
 - `tests/unit/use-email-generator.spec.ts`: Composable state management email generator.
 - `tests/unit/job-analysis.spec.ts`: Composable alur analisis kecocokan pekerjaan.
 
-Matriks penanganan error lengkap dapat dipelajari di [`docs/testing/error-matrix.md`](docs/testing/error-matrix.md).
+Panduan verifikasi fungsional dan matriks error dapat dipelajari di:
+- **Panduan Verifikasi Manual**: [`docs/testing/manual-verification-guide.md`](docs/testing/manual-verification-guide.md) (Checklist QA 13 skenario pra-unggah store).
+- **Matriks Penanganan Error**: [`docs/testing/error-matrix.md`](docs/testing/error-matrix.md).
 
 ---
 
 ## 🚀 Publikasi ke Web Store (Chrome & Edge)
 
 Panduan komprehensif untuk mempublikasikan ekstensi ke toko peramban resmi:
+- **Panduan Verifikasi Manual Pra-Publikasi**: [`docs/testing/manual-verification-guide.md`](docs/testing/manual-verification-guide.md) (Checklist evaluasi kelayakan Go / No-Go).
 - **Panduan Publikasi Toko**: [`docs/deployment/store-publishing-guide.md`](docs/deployment/store-publishing-guide.md) (Langkah upload, checklist aset, dan justifikasi permission).
 - **Kebijakan Privasi Publik**: [`PRIVACY_POLICY.md`](PRIVACY_POLICY.md) (Wajib dicantumkan saat upload ke Google & Microsoft).
-- **Paket ZIP Rilis**: Siap diunggah langsung dari `release/crx-job-seek-assistant-1.0.0.zip` (dihasilkan otomatis via `npm run build`).
+- **Paket ZIP Rilis**: Siap diunggah langsung dari `release/crx-job-seek-assistant-1.1.0.zip` (dihasilkan otomatis via `npm run build`).
 - **Biaya Pendaftaran Developer**:
   - **Microsoft Edge Add-ons**: **GRATIS ($0 / Free)**.
   - **Chrome Web Store**: **$5 USD** (sekali bayar seumur hidup via Google Payments).
