@@ -1,6 +1,6 @@
 # Privacy Policy for Job Seek Assistant
 
-**Last Updated**: September 2026
+**Last Updated**: November 2026
 
 ## 1. Overview
 **Job Seek Assistant** is a client-side open-source browser extension (Manifest V3) designed to help job seekers analyze job postings, evaluate qualification matches against candidate CVs, and generate personalized job application emails. 
@@ -31,6 +31,7 @@ The extension communicates directly with official Google APIs using the credenti
 - `sidePanel`: Renders the assistant interface in the browser side panel beside the active job listing.
 - `storage`: Preserves application settings, API keys, and CV cache locally on your machine (`chrome.storage.local`).
 - `activeTab`: Extracts job title, company name, requirements, and recruiter emails from the currently active tab only when you initiate the extraction action.
+- `scripting`: Executes content scripts safely to read job posting DOM structures on demand without persistent background monitoring.
 - `identity`: Facilitates secure Google OAuth 2.0 authentication for Google Drive and Gmail integrations.
 - **Host Permissions** (`https://generativelanguage.googleapis.com/*`, `https://gmail.googleapis.com/*`, `https://www.googleapis.com/*`): Enables direct, client-to-API communication with Google Gemini for AI analysis, Google Drive for CV importing, and Gmail for draft/email dispatch.
 

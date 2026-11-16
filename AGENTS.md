@@ -14,8 +14,11 @@ Aturan ini wajib dipatuhi oleh asisten AI dalam mengelola dan memodifikasi repos
 
 ## 2. Aturan Pembaruan Kebijakan Privasi (`PRIVACY_POLICY.md`)
 
-- **HANYA PERBARUI** berkas `PRIVACY_POLICY.md` jika terdapat perubahan yang berdampak langsung pada privasi pengguna dan kepatuhan izin, seperti:
-  - Perubahan atau penambahan `permissions` atau `host_permissions` pada `manifest.config.ts`.
+- **WAJIB DI-TRACK & DI-PUSH KE GITHUB**: Berkas `PRIVACY_POLICY.md` adalah dokumen publik resmi yang wajib selalu dilacak oleh Git dan dipush ke GitHub (tidak boleh dimasukkan ke dalam `.gitignore`) sebagai syarat kepatuhan publikasi toko ekstensi peramban (Microsoft Edge Add-ons & Chrome Web Store).
+- **WAJIB DIUPDATE OTOMATIS OLEH AI JIKA ADA PERUBAHAN**: AI **wajib** secara proaktif memperbarui berkas `PRIVACY_POLICY.md` setiap kali terdapat perubahan teknis yang berdampak langsung pada privasi pengguna dan kepatuhan izin, seperti:
+  - Perubahan atau penambahan `permissions` atau `host_permissions` pada `manifest.config.ts` (misalnya izin `scripting`, `identity`, `storage`, dll.).
+  - Perubahan cakupan izin Google OAuth (*scopes* Google Drive / Gmail).
   - Perubahan cara penyimpanan lokal (`chrome.storage`), transmisi data, atau pengolahan data sensitif pengguna (CV, email, profil akun Google).
   - Penambahan layanan eksternal atau API pihak ketiga baru.
+  - Pembaruan tanggal *Last Updated* pada berkas tersebut saat klausul privasi mengalami perubahan.
 - Jika perubahan hanya menyangkut perbaikan bug tampilan, refactoring kode internal, logika scraper, atau fitur yang tidak mengubah perlakuan data privasi, **DILARANG** mengubah `PRIVACY_POLICY.md`.
