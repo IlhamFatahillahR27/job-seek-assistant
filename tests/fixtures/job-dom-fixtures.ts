@@ -226,6 +226,35 @@ export const UNIVERSAL_CAREER_DOM_FIXTURE = `
 </html>
 `
 
+export const INSTAGRAM_DOM_FIXTURE = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>hiresflow on Instagram: "hiresflow WE ARE HIRING! Wowrack Indonesia is looking for a Software Development Admin to join our team in Surabaya (Hybrid Setup)! Check out the poster below for key responsibilities and requirements. Detail posisi & cara melamar tersedia di poster."</title>
+  <meta property="og:title" content="hiresflow on Instagram: &quot;hiresflow WE ARE HIRING!&quot;" />
+  <meta property="og:description" content="hiresflow on October 29, 2026: &quot;hiresflow WE ARE HIRING! PT Wowrack Indonesia is looking for a Software Development Admin to join our team in Surabaya (Hybrid Setup)! recruitment@wowrack.co.id&quot;" />
+</head>
+<body>
+  <article>
+    <header>
+      <a role="link" href="/hiresflow/">hiresflow</a>
+      <img src="https://cdn.example.com/avatar.jpg" alt="hiresflow's profile picture" width="40" height="40" />
+    </header>
+    <div role="presentation">
+      <ul>
+        <li>
+          <img src="https://scontent.cdninstagram.com/poster_page1.jpg" alt="Photo 1" width="1080" height="1080" />
+        </li>
+      </ul>
+    </div>
+    <div class="caption-container">
+      <h1 dir="auto">hiresflow WE ARE HIRING! PT Wowrack Indonesia is looking for a Software Development Admin to join our team in Surabaya (Hybrid Setup)! Apply to recruitment@wowrack.co.id</h1>
+    </div>
+  </article>
+</body>
+</html>
+`
+
 export const PROMPT_INJECTION_DOM_FIXTURE = `
 <!DOCTYPE html>
 <html>

@@ -3,6 +3,7 @@ import { LinkedInScraper } from '@/content/scrapers/linkedin'
 import { GlintsScraper } from '@/content/scrapers/glints'
 import { JobstreetScraper } from '@/content/scrapers/jobstreet'
 import { IndeedScraper } from '@/content/scrapers/indeed'
+import { InstagramScraper } from '@/content/scrapers/instagram'
 import { UniversalScraper } from '@/content/scrapers/universal'
 import { extractJobFromDocument } from '@/content/scrapers'
 import {
@@ -13,6 +14,7 @@ import {
   JOBSTREET_SPLIT_VIEW_FIXTURE,
   JOBSTREET_STATE_SCRIPT_FIXTURE,
   INDEED_DOM_FIXTURE,
+  INSTAGRAM_DOM_FIXTURE,
   UNIVERSAL_CAREER_DOM_FIXTURE,
   PROMPT_INJECTION_DOM_FIXTURE,
 } from '../fixtures/job-dom-fixtures'
@@ -169,6 +171,35 @@ describe('Job Scrapers Unit Tests', () => {
       expect(result?.description).toContain('Data Nusantara mengundang talenta terbaik')
       expect(result?.requirements).toContain('Golang atau Python')
       expect(result?.platform).toBe('indeed')
+    })
+  })
+
+  describe('InstagramScraper', () => {
+    const scraper = new InstagramScraper()
+
+    it('should match valid Instagram URLs', () => {
+      expect(scraper.matches('https://www.instagram.com/p/DfEh3hck6g-/?img_index=3')).toBe(true)
+      expect(scraper.matches('https://instagram.com/reel/12345/')).toBe(true)
+      expect(scraper.matches('https://linkedin.com/jobs/view/1')).toBe(false)
+    })
+
+    it('should correctly extract caption, poster images, company, title, and recruiter email from Instagram DOM fixture', () => {
+      const doc = createDocFromHtml(INSTAGRAM_DOM_FIXTURE)
+      const url = 'https://www.instagram.com/p/DfEh3hck6g-/?img_index=3'
+      const result = scraper.extract(doc, url)
+
+      expect(result).not.toBeNull()
+      expect(result?.platform).toBe('instagram')
+      expect(result?.company).toBe('PT Wowrack Indonesia')
+      expect(result?.title).toBe('Software Development Admin')
+      expect(result?.location).toBe('Surabaya')
+      expect(result?.workplaceType).toBe('Hybrid')
+      expect(result?.recruiterEmail).toBe('recruitment@wowrack.co.id')
+      expect(result?.description).toContain('Software Development Admin')
+      // Avatar photo must be excluded, only poster image included
+      expect(result?.posterImages).toBeDefined()
+      expect(result?.posterImages?.length).toBe(1)
+      expect(result?.posterImages?.[0]).toContain('poster_page1.jpg')
     })
   })
 

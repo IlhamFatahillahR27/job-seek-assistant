@@ -3,56 +3,57 @@
 
 > **AI-Powered Job Application Assistant with Grounded CV Memory, Real-time Web Scraping, Multi-Language Email Generation, and Direct Gmail Dispatch.**
 
-Job Seek Assistant adalah ekstensi peramban (*browser extension*) Manifest V3 berbasis Vue 3, TypeScript, dan Tailwind CSS. Ekstensi ini dirancang untuk mendampingi pencari kerja secara end-to-end: mengekstrak informasi lowongan kerja dari portal karir aktif, menganalisis kecocokan (*match score & gap analysis*) terhadap CV pengguna secara objektif tanpa halusinasi, menghasilkan email lamaran terpersonalisasi dalam berbagai gaya dan bahasa, serta menyimpannya ke draf atau mengirimkannya langsung via Gmail API dengan lampiran CV asli.
+Job Seek Assistant is an enterprise-grade Manifest V3 browser extension built with Vue 3, TypeScript, and Tailwind CSS. Designed to accompany job seekers end-to-end, it extracts job postings from active career portals and social media flyers, analyzes candidate-job fit (*match score & gap analysis*) objectively without hallucination, generates personalized cover emails across multiple tones and languages, and drafts or dispatches them directly via the official Gmail API with original CV attachments.
 
 ---
 
-## ✨ Fitur Utama
+## ✨ Key Features
 
-- **🖥️ Chrome Side Panel Modern UI**: Antarmuka responsif dan terintegrasi langsung di bilah samping (*side panel*) browser tanpa mengganggu alur penjelajahan.
-- **👋 Welcome / Landing Screen & Onboarding (v1.1.0)**:
-  - Halaman awal terdedikasi saat ekstensi pertama kali dibuka atau setelah sesi demo berakhir.
-  - Membatasi akses tab utama sebelum pengguna masuk dengan akun Google atau memilih Mode Demo.
-  - Dialog modal otomatis konfigurasi Gemini API Key pasca-login dengan tautan instan ke Google AI Studio.
-  - Banner panduan pengisian Profil CV di tab Analisa sebelum memulai ekstraksi lowongan.
+- **🖥️ Modern Chrome Side Panel UI**: Responsive, fluid interface seamlessly integrated into the browser's side panel, preserving natural web browsing flows without intrusive popup windows.
+- **👋 Welcome / Landing Screen & Onboarding**:
+  - Dedicated initial onboarding view when the extension is first installed or after concluding a demo session.
+  - Access control locking primary tabs until the user either logs in via Google Workspace or starts a simulated Demo session.
+  - Post-login Gemini API Key modal with a direct link to Google AI Studio for immediate configuration.
+  - Contextual CV setup guidance banner on the Analysis tab before starting job extraction.
 - **📁 Google Drive CV Memory & Synchronizer**:
-  - Pemilihan berkas CV langsung dari Google Drive v3 (format **PDF** & **Google Docs**).
-  - Ekstraksi teks dokumen otomatis berbasis PDF.js dan export plain text Drive API.
-  - Deteksi pembaruan berkas CV (*timestamp & checksum*) dengan sinkronisasi satu klik.
-  - Fallback pengisian manual jika tidak menggunakan Google Drive.
+  - Direct document picker from Google Drive v3 (supporting **PDF** & **Google Docs** formats).
+  - Self-contained, offline-capable PDF text extraction via bundled PDF.js worker and Google Docs plain text export.
+  - File change detection (*timestamp & MD5 checksum*) with one-click synchronization.
+  - Structured manual CV fallback for users without Google Workspace accounts.
 - **🌐 Active Web Job Scraper Engine**:
-  - Content script dengan ekstraktor khusus untuk portal kerja terkemuka: **LinkedIn Jobs**, **Glints**, **Jobstreet**, dan **Indeed**.
-  - Ekstraktor heuristik universal untuk situs karir independen perusahaan.
-  - Sanitasi teks otomatis untuk menangkal serangan *indirect prompt injection*.
+  - Specialized content script extractors for top career portals: **LinkedIn Jobs**, **Glints**, **Jobstreet / SEEK**, and **Indeed**.
+  - **📸 Instagram Job Flyer Multimodal Extractor (v1.2.0)**: Dedicated extractor for Instagram job posts (`/p/*`, `/reel/*`) combining caption text and carousel/poster images processed via Gemini Multimodal Vision.
+  - Universal heuristic extractor targeting independent enterprise career sites (Greenhouse, Lever, Workable, Ashby, etc.).
+  - Automated text sanitization neutralizing indirect prompt injection attacks.
 - **🧠 Gemini AI Grounded Match & Gap Analysis**:
-  - Menggunakan model Google Gemini (`gemini-2.0-flash` / `gemini-1.5-flash`).
-  - *Context isolation* ketat dengan isolasi tag XML (`<candidate_cv>`, `<job_posting>`).
-  - *Zero-hallucination guardrail*: AI dilarang keras mengarang atau menambahkan keahlian di luar isi CV pengguna.
-  - Metrik visual: Skor Relevansi (0–100%), Matched Skills dengan bukti kutipan CV, Missing Skills (kesenjangan kualifikasi), dan Poin Sorotan Interview.
+  - Powered by Google Gemini reasoning models (`gemini-2.0-flash` / `gemini-1.5-flash`).
+  - Strict context isolation via designated XML tags (`<candidate_cv>`, `<job_posting>`).
+  - *Zero-hallucination guardrails*: The model is strictly prohibited from inventing skills or experience outside the candidate's CV.
+  - Comprehensive metrics: Relevance Score (0–100%), Matched Skills with verbatim CV evidence citations, Missing Skills (gap analysis with actionable recommendations), and Interview Highlights.
 - **✉️ Multi-Tone & Multi-Language Email Generator**:
-  - 3 variasi gaya email instan: **Formal**, **Impact / Project-focused**, dan **Concise Pitch**.
-  - Pilihan bahasa fleksibel: **Bahasa Indonesia**, **English**, atau **Auto (menyesuaikan deskripsi lowongan)**.
-  - **Iterative Refinement ("Masukan Perubahan")**: Perhalus draf email melalui perintah prompt revisi ke AI.
-  - Deteksi otomatis email recruiter dari lowongan yang diekstrak.
+  - 3 instant tone variations: **Formal**, **Impact / Project-focused**, and **Concise Pitch**.
+  - Flexible language options: **English**, **Bahasa Indonesia**, or **Auto (matching the vacancy description)**.
+  - **Iterative Refinement**: Refine and polish email drafts with natural-language revision prompts.
+  - Automated recruiter email address detection from scraped job pages and flyer posters.
 - **📬 Dual Gmail Dispatch**:
-  - **Simpan ke Draft**: Membuat draf resmi di kotak masuk Gmail pengguna (`users.me.drafts.create`).
-  - **Kirim Email Langsung**: Mengirim email langsung via Gmail API (`users.me.messages.send`) dengan modal konfirmasi ringkasan.
-  - Pembentukan payload MIME RFC 2822 base64url terenkapsulasi dengan opsi menyertakan berkas CV PDF asli dari Google Drive sebagai lampiran.
-- **🛡️ Error Resilience, Session Recovery & Anti-Stuck**:
-  - Deteksi otomatis sesi Google OAuth kedaluwarsa dengan auto-redirect ke menu awal dan notifikasi amber informatif.
-  - Validasi proaktif format Client ID di sisi klien (mencegah kekeliruan input API Key `AIza...`).
-  - Pencegahan tombol membeku (*anti-stuck*) dengan tombol pembatalan interaktif (*Cancel*) dan *safety timeout* 45 detik.
-  - Banner status offline otomatis di UI saat koneksi internet terputus.
-  - **Mode Simulasi (Demo Mode)** lengkap dengan banner status persisten di seluruh tab navigasi dan tombol *"Selesai Demo"*.
+  - **Save to Drafts**: Creates official drafts in the user's Gmail mailbox (`users.me.drafts.create`).
+  - **Direct Send**: Sends application emails directly via the Gmail API (`users.me.messages.send`) with a confirmation modal.
+  - Encapsulated RFC 2822 base64url MIME payload generation with optional inclusion of the candidate's original PDF CV from Google Drive as an attachment.
+- **🛡️ Error Resilience, Session Recovery & Anti-Stuck Safeguards**:
+  - Automatic detection of expired Google OAuth sessions with seamless redirection to the welcome view and informative alert banners.
+  - Proactive client-side Client ID format validation (preventing accidental entry of Gemini API Keys `AIza...`).
+  - Anti-freeze safeguards featuring an interactive *Cancel* button and a 45-second safety timeout.
+  - Offline network detection with automated UI alert banners.
+  - **Comprehensive Demo Mode Simulation** complete with persistent status indicators across navigation tabs and a quick *"End Demo"* action.
 
 ---
 
-## 🏗️ Arsitektur Sistem
+## 🏗️ System Architecture
 
 ```mermaid
 flowchart TD
     subgraph Browser["Web Browser (Chrome / Edge)"]
-        CS["Content Script (src/content)"] -- Ekstraksi DOM Lowongan --> BG["Service Worker (src/background)"]
+        CS["Content Script (src/content)"] -- DOM Scraping & Poster Extraction --> BG["Service Worker (src/background)"]
         SP["Side Panel UI (Vue 3 + Tailwind)"] <-->|chrome.runtime.sendMessage| BG
     end
 
@@ -74,142 +75,142 @@ flowchart TD
 
 ---
 
-## 📋 Prasyarat
+## 📋 Prerequisites
 
-- **Node.js**: Versi `>= 18.0.0` (disarankan Node.js 20 LTS atau 22 LTS).
-- **Package Manager**: `npm` (disertakan bersama Node.js).
-- **Google Chrome** (versi 116+) atau **Microsoft Edge** (versi 116+) dengan dukungan Side Panel API Manifest V3.
-- *(Opsional)* **Google Gemini API Key**: Dapatkan gratis di [Google AI Studio](https://aistudio.google.com/). *(Jika tidak ada, Anda dapat menggunakan Mode Demo).*
-- *(Opsional)* **Google Cloud Console OAuth 2.0 Client ID**: Untuk integrasi Google Drive & Gmail asli. *(Jika tidak ada, Anda dapat menggunakan Mode Demo).*
+- **Node.js**: Version `>= 18.0.0` (Node.js 20 LTS or 22 LTS recommended).
+- **Package Manager**: `npm` (bundled with Node.js).
+- **Google Chrome** (v116+) or **Microsoft Edge** (v116+) with Manifest V3 Side Panel API support.
+- *(Optional)* **Google Gemini API Key**: Obtain for free at [Google AI Studio](https://aistudio.google.com/). *(Demo Mode is available without an API key).*
+- *(Optional)* **Google Cloud Console OAuth 2.0 Client ID**: For live Google Drive & Gmail integration. *(Demo Mode is available without GCP credentials).*
 
 ---
 
-## 🚀 Panduan Instalasi Cepat
+## 🚀 Quickstart Installation Guide
 
-### 1. Kloning & Pasang Dependensi
+### 1. Clone & Install Dependencies
 ```bash
 git clone https://github.com/IlhamFatahillahR27/job-seek-assistant.git
 cd job-seek-assistant
 npm install
 ```
 
-### 2. Jalankan Server Pengembangan atau Buat Build Produksi
-- Untuk mode pengembangan dengan *hot module replacement*:
+### 2. Run Development Server or Build for Production
+- For development with hot-module reloading:
   ```bash
   npm run dev
   ```
-- Untuk membuat build produksi teroptimasi:
+- To build the optimized production package:
   ```bash
   npm run build
   ```
-  *Hasil build akan tersimpan di direktori `dist/` dan paket zip rilis akan otomatis terbentuk di `release/crx-job-seek-assistant-1.1.0.zip`.*
+  *The compiled extension will be output to the `dist/` directory, and a packaged release zip will be generated in `release/crx-job-seek-assistant-1.2.0.zip`.*
 
-### 3. Memasang Ekstensi di Google Chrome
-1. Buka Google Chrome dan ketik `chrome://extensions/` pada bilah alamat.
-2. Aktifkan toggle **"Developer mode"** di pojok kanan atas.
-3. Klik tombol **"Load unpacked"** di pojok kiri atas.
-4. Pilih folder `dist/` yang berada di dalam direktori proyek ini.
-5. Ekstensi **Job Seek Assistant** akan muncul di daftar ekstensi.
-6. Sematkan (*pin*) ikon ekstensi pada toolbar browser, lalu klik ikon tersebut untuk membuka Side Panel.
+### 3. Load Extension into Google Chrome
+1. Open Google Chrome and navigate to `chrome://extensions/`.
+2. Enable **"Developer mode"** in the top-right corner.
+3. Click **"Load unpacked"** in the top-left corner.
+4. Select the `dist/` folder inside this project directory.
+5. **Job Seek Assistant** will now appear in your extensions list.
+6. Pin the extension icon to your browser toolbar, then click it to open the Side Panel.
 
-### 4. Memasang Ekstensi di Microsoft Edge
-1. Buka Microsoft Edge dan ketik `edge://extensions/` pada bilah alamat.
-2. Aktifkan toggle **"Developer mode"** di panel samping kiri.
-3. Klik tombol **"Load unpacked"**.
-4. Pilih folder `dist/` proyek.
-5. Klik ikon ekstensi untuk membuka panel samping.
+### 4. Load Extension into Microsoft Edge
+1. Open Microsoft Edge and navigate to `edge://extensions/`.
+2. Enable **"Developer mode"** in the left sidebar.
+3. Click **"Load unpacked"**.
+4. Select the project's `dist/` folder.
+5. Click the extension icon to open the Side Panel.
 
 ---
 
-## ⚙️ Panduan Konfigurasi
+## ⚙️ Configuration Guide
 
-### A. Konfigurasi Google Workspace (OAuth 2.0 Client ID)
-1. Buat atau gunakan OAuth 2.0 Client ID bertipe **Web application** di [Google Cloud Console](https://console.cloud.google.com/apis/credentials).
-2. Salin file template `.env.example` menjadi `.env`:
+### A. Google Workspace Setup (OAuth 2.0 Client ID)
+1. Create or use an OAuth 2.0 Client ID of type **Web application** in the [Google Cloud Console](https://console.cloud.google.com/apis/credentials).
+2. Copy the template `.env.example` file to `.env`:
    ```bash
    cp .env.example .env
    ```
-3. Masukkan Client ID Anda ke variabel `VITE_GOOGLE_CLIENT_ID` di dalam `.env`:
+3. Set your Client ID in `VITE_GOOGLE_CLIENT_ID`:
    ```env
    VITE_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
    ```
-4. Tambahkan *Authorized redirect URIs* ekstensi ke Google Cloud Console:
-   - Dapatkan URI ekstensi dari menu Pengaturan atau `https://<ID-EKSTENSI>.chromiumapp.org/`.
-   - Simpan di Google Cloud Console -> Credentials -> OAuth 2.0 Client ID -> Authorized redirect URIs.
-5. Jalankan `npm run build` — Client ID akan otomatis terpasang aman di dalam sistem tanpa perlu diinput manual oleh pengguna akhir.
-6. *(Alternatif)* Gunakan tombol **"Coba Mode Demo"** pada halaman awal untuk simulasi Google Drive & Gmail tanpa kredensial GCP.
+4. Add the extension's redirect URI to *Authorized redirect URIs* in Google Cloud Console:
+   - Obtain the URI from the Settings tab or use `https://<EXTENSION_ID>.chromiumapp.org/`.
+   - Add it to: Google Cloud Console -> Credentials -> OAuth 2.0 Client ID -> Authorized redirect URIs.
+5. Run `npm run build` — the Client ID will be automatically embedded at build time without requiring manual entry by end users.
+6. *(Alternative)* Click **"Try Demo Mode"** on the Welcome screen to simulate Google Drive & Gmail without GCP credentials.
 
-### B. Konfigurasi Google Gemini API
-1. Buka [Google AI Studio](https://aistudio.google.com/) dan buat API Key baru.
-2. Saat pertama kali login, dialog modal konfigurasi Gemini API Key akan otomatis muncul, atau buka tab **Pengaturan** di Side Panel.
-3. Masukkan API Key pada kolom **Google Gemini API Key** lalu klik **"Uji Koneksi"**.
-4. Pilih model yang diinginkan (default: `gemini-2.0-flash` atau model reasoning `gemini-2.0-flash-thinking-exp`).
-5. *(Alternatif)* Aktifkan **"Mode Simulasi Gemini AI (Demo)"** untuk evaluasi tanpa API key.
+### B. Google Gemini API Setup
+1. Visit [Google AI Studio](https://aistudio.google.com/) and create an API Key.
+2. Upon logging in for the first time, a setup modal will appear automatically, or you can open the **Settings** tab in the Side Panel.
+3. Paste the API Key into the **Google Gemini API Key** field and click **"Test Connection"**.
+4. Select your preferred model (default: `gemini-2.0-flash` or reasoning model `gemini-2.0-flash-thinking-exp`).
+5. *(Alternative)* Enable **"Gemini AI Simulation Mode (Demo)"** to evaluate features without an API key.
 
 ---
 
-## 🛠️ Skrip Pengembangan & Pengujian
+## 🛠️ Development & Testing Scripts
 
-| Perintah | Deskripsi |
+| Command | Description |
 | :--- | :--- |
-| `npm run dev` | Menjalankan Vite development server dengan integrasi `@crxjs/vite-plugin`. |
-| `npm run test` | Menjalankan seluruh test suite otomatis menggunakan **Vitest** (19 test suite, 133 tests). |
-| `npm run test:watch` | Menjalankan Vitest dalam mode watch interaktif. |
-| `npm run build` | Menjalankan typecheck TypeScript (`vue-tsc -b`) dan memaketkan ekstensi ke folder `dist/` serta membuat file rilis zip di `release/`. |
+| `npm run dev` | Starts the Vite development server with `@crxjs/vite-plugin` integration. |
+| `npm run test` | Executes the complete automated test suite using **Vitest** (19 test suites, 137 tests). |
+| `npm run test:watch` | Runs Vitest in interactive watch mode. |
+| `npm run build` | Performs TypeScript typechecking (`vue-tsc -b`), bundles the extension to `dist/`, and creates the release zip archive in `release/`. |
 
 ---
 
-## 🧪 Rangkaian Pengujian Otomatis (Test Suite)
+## 🧪 Automated Test Suite
 
-Proyek ini dilengkapi dengan 19 test suite otomatis yang mencakup 133 unit tests (100% passed):
-- `tests/unit/welcome-flow.spec.ts`: Pengujian alur Welcome Screen, siklus hidup Mode Demo, modal API key, panduan onboarding CV, dan deteksi sesi expired.
-- `tests/unit/reference-cv.spec.ts`: Parsing berkas resume/CV referensi nyata ke struktur profil terperinci.
-- `tests/unit/error-resilience.spec.ts`: Pengujian ketahanan offline, silent re-auth 401, error 404, dan limit kuota 429.
-- `tests/unit/cv-parser.spec.ts`: Ekstraksi teks PDF & Docs serta fallback binary extractor.
-- `tests/unit/cv-sync.spec.ts`: Deteksi perubahan berkas Google Drive dan sinkronisasi timestamp.
-- `tests/unit/job-scrapers.spec.ts`: Parsing DOM LinkedIn, Glints, Jobstreet, Indeed.
-- `tests/unit/job-extractor.spec.ts`: Heuristic fallback extractor untuk portal karir umum.
-- `tests/unit/sanitizer.spec.ts`: Sanitasi teks dan pencegahan *indirect prompt injection*.
-- `tests/unit/gemini-client.spec.ts`: Koneksi API Gemini, validasi key, auto-fallback model.
-- `tests/unit/gemini-guardrail.spec.ts`: Evaluasi anti-halusinasi dan pencocokan keahlian.
-- `tests/unit/email-generator.spec.ts`: Pembuatan draf multi-tone, multi-language, dan revisi iteratif.
-- `tests/unit/mime-builder.spec.ts`: Pembentukan pesan MIME RFC 2822 base64url dengan lampiran PDF.
-- `tests/unit/gmail-client.spec.ts`: Pembuatan draft dan pengiriman langsung via Gmail API.
-- `tests/unit/google-auth.spec.ts`: Otentikasi OAuth2, refresh token, validasi Client ID, dan penanganan sesi.
-- `tests/unit/storage.spec.ts`: Wrapper reaktif `chrome.storage.local`.
-- `tests/unit/sidepanel-tabs.spec.ts`: Render navigasi tab dan antarmuka Side Panel.
-- `tests/unit/use-email-generator.spec.ts`: Composable state management email generator.
-- `tests/unit/job-analysis.spec.ts`: Composable alur analisis kecocokan pekerjaan.
+The project includes 19 comprehensive test suites covering 137 unit tests (100% passing):
+- `tests/unit/job-scrapers.spec.ts`: DOM parsing for LinkedIn, Glints, Jobstreet/SEEK, Indeed, and Instagram post scrapers.
+- `tests/unit/cv-parser.spec.ts`: PDF & Google Docs text extraction, PDF.js worker integration, and sanitized fallback validation.
+- `tests/unit/reference-cv.spec.ts`: Real-world CV reference document extraction validating structured profile attributes.
+- `tests/unit/gemini-client.spec.ts`: Gemini API client, key validation, multimodal payload formation, and automated model fallback.
+- `tests/unit/welcome-flow.spec.ts`: Onboarding view lifecycle, Demo mode transitions, API key modals, and session expiration redirects.
+- `tests/unit/error-resilience.spec.ts`: Offline resilience, silent 401 re-authentication, 404 handling, and rate limit 429 recovery.
+- `tests/unit/cv-sync.spec.ts`: Google Drive file change detection and timestamp synchronization.
+- `tests/unit/job-extractor.spec.ts`: Heuristic fallback extractor and AI-assisted extraction composable.
+- `tests/unit/sanitizer.spec.ts`: Text sanitization, HTML stripping, and indirect prompt injection defense.
+- `tests/unit/gemini-guardrail.spec.ts`: Anti-hallucination constraints and grounded skill matching evaluation.
+- `tests/unit/email-generator.spec.ts`: Multi-tone, multi-language email generation and iterative prompt refinement.
+- `tests/unit/mime-builder.spec.ts`: RFC 2822 base64url MIME message synthesis with PDF attachments.
+- `tests/unit/gmail-client.spec.ts`: Draft creation and direct email dispatch via Gmail API.
+- `tests/unit/google-auth.spec.ts`: OAuth2 flow, token refresh, Client ID validation, and session lifecycle.
+- `tests/unit/storage.spec.ts`: Reactive wrapper around `chrome.storage.local`.
+- `tests/unit/sidepanel-tabs.spec.ts`: Tab navigation rendering and Side Panel UI integrity.
+- `tests/unit/use-email-generator.spec.ts`: State management composable for the email generation pipeline.
+- `tests/unit/job-analysis.spec.ts`: Composable managing candidate-job analysis states.
 
-Panduan verifikasi fungsional dan matriks error dapat dipelajari di:
-- **Panduan Verifikasi Manual**: [`docs/testing/manual-verification-guide.md`](docs/testing/manual-verification-guide.md) (Checklist QA 13 skenario pra-unggah store).
-- **Matriks Penanganan Error**: [`docs/testing/error-matrix.md`](docs/testing/error-matrix.md).
-
----
-
-## 🚀 Publikasi ke Web Store (Chrome & Edge)
-
-Panduan komprehensif untuk mempublikasikan ekstensi ke toko peramban resmi:
-- **Panduan Verifikasi Manual Pra-Publikasi**: [`docs/testing/manual-verification-guide.md`](docs/testing/manual-verification-guide.md) (Checklist evaluasi kelayakan Go / No-Go).
-- **Panduan Publikasi Toko**: [`docs/deployment/store-publishing-guide.md`](docs/deployment/store-publishing-guide.md) (Langkah upload, checklist aset, dan justifikasi permission).
-- **Kebijakan Privasi Publik**: [`PRIVACY_POLICY.md`](PRIVACY_POLICY.md) (Wajib dicantumkan saat upload ke Google & Microsoft).
-- **Paket ZIP Rilis**: Siap diunggah langsung dari `release/crx-job-seek-assistant-1.1.0.zip` (dihasilkan otomatis via `npm run build`).
-- **Biaya Pendaftaran Developer**:
-  - **Microsoft Edge Add-ons**: **GRATIS ($0 / Free)**.
-  - **Chrome Web Store**: **$5 USD** (sekali bayar seumur hidup via Google Payments).
+For QA procedures and error handling matrices:
+- **Manual Verification Guide**: [`docs/testing/manual-verification-guide.md`](docs/testing/manual-verification-guide.md) (13-scenario QA checklist).
+- **Error Handling Matrix**: [`docs/testing/error-matrix.md`](docs/testing/error-matrix.md).
 
 ---
 
-## 🔒 Keamanan & Perlindungan Privasi
+## 🚀 Web Store Publishing (Chrome & Edge)
 
-1. **Local Storage First**: Seluruh data profil CV, riwayat analisis, dan draft email disimpan secara lokal di peramban pengguna menggunakan `chrome.storage.local` dan tidak dikirimkan ke server pihak ketiga mana pun selain Google APIs resmi.
-2. **Context Isolation**: Prompt AI dirancang dengan pembatas tag XML yang ketat untuk mengisolasi konten CV dan lowongan kerja dari instruksi sistem.
-3. **Anti-Prompt Injection**: Seluruh input teks dari halaman web melewati pembersih (*sanitizer*) untuk menetralisir instruksi tersembunyi (*jailbreak/override attempts*).
-4. **Minimal Scopes**: Izin OAuth dibatasi hanya pada pembacaan file Drive terpilih (`drive.readonly`) dan pengelolaan email lamaran (`gmail.compose`, `gmail.send`).
+Documentation for publishing the extension to official browser web stores:
+- **Pre-Publishing Verification Guide**: [`docs/testing/manual-verification-guide.md`](docs/testing/manual-verification-guide.md) (Go / No-Go evaluation criteria).
+- **Store Publishing Guide**: [`docs/deployment/store-publishing-guide.md`](docs/deployment/store-publishing-guide.md) (Submission steps, asset checklists, and permission justifications).
+- **Public Privacy Policy**: [`PRIVACY_POLICY.md`](PRIVACY_POLICY.md) (Required compliance document for Google & Microsoft store reviews).
+- **Packaged ZIP Release**: Ready for direct upload from `release/crx-job-seek-assistant-1.2.0.zip` (automatically created by `npm run build`).
+- **Developer Registration Fees**:
+  - **Microsoft Edge Add-ons**: **FREE ($0 / Free)**.
+  - **Chrome Web Store**: **$5 USD** (one-time registration fee via Google Payments).
 
 ---
 
-## 📄 Lisensi
+## 🔒 Security & Privacy Architecture
 
-Proyek ini didistribusikan di bawah lisensi privat untuk keperluan pengembangan profesional.
-Dibuat dengan ❤️ oleh [Ilham Fatahillah](https://github.com/IlhamFatahillahR27).
+1. **Local Storage First**: All candidate profiles, analysis records, and email drafts remain locally stored in the user's browser via `chrome.storage.local`. No data is transferred to any third-party servers other than official Google APIs.
+2. **Context Isolation**: AI prompts utilize strict XML delimiter tags to isolate user CV content and job descriptions from system-level instructions.
+3. **Anti-Prompt Injection Defense**: All web page content is sanitized to neutralize hidden instructions, jailbreak attempts, and malicious override payloads.
+4. **Minimal OAuth Scopes**: OAuth permissions are restricted to read-only access for chosen Drive files (`drive.readonly`) and application email dispatch (`gmail.compose`, `gmail.send`).
+
+---
+
+## 📄 License
+
+This project is licensed under a private license for professional development.
+Created with ❤️ by [Ilham F](https://github.com/IlhamFatahillahR27).

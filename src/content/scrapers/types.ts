@@ -10,6 +10,7 @@ export interface ScrapeResult {
   recruiterEmail?: string
   platform: JobPlatform
   url: string
+  posterImages?: string[]
 }
 
 export interface JobScraper {

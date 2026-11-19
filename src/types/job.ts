@@ -2,7 +2,7 @@
  * Job Details and Extraction Type Definitions
  */
 
-export type JobPlatform = 'linkedin' | 'glints' | 'jobstreet' | 'indeed' | 'custom'
+export type JobPlatform = 'linkedin' | 'glints' | 'jobstreet' | 'indeed' | 'instagram' | 'custom'
 
 export type WorkplaceType = 'Remote' | 'Hybrid' | 'On-site' | 'Unspecified'
 
@@ -21,6 +21,7 @@ export interface JobDetails {
   rawHtml?: string
   rawPageText?: string
   extractionMethod?: 'dom' | 'ai'
+  posterImages?: string[]
 }
 
 export interface JobExtractionStatus {

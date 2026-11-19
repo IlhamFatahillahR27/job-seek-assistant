@@ -165,16 +165,14 @@ export class CVParserService {
     }
 
     try {
-      // In web extension environment, configure worker from extension assets if available
-      if (pdfjsLib.GlobalWorkerOptions && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      // In web extension environment, configure worker from extension assets
+      if (pdfjsLib.GlobalWorkerOptions) {
         if (typeof window !== 'undefined' && (window as any).chrome?.runtime?.getURL) {
           try {
             pdfjsLib.GlobalWorkerOptions.workerSrc = (window as any).chrome.runtime.getURL('assets/pdf.worker.mjs')
           } catch {
             pdfjsLib.GlobalWorkerOptions.workerSrc = ''
           }
-        } else {
-          pdfjsLib.GlobalWorkerOptions.workerSrc = ''
         }
       }
 
@@ -230,6 +228,24 @@ export class CVParserService {
   }
 
   /**
+   * Helper to validate whether an extracted string is readable text or binary junk
+   */
+  private static isMeaningfulText(text: string): boolean {
+    if (!text || text.trim().length < 15) return false
+    // Reject if contains replacement characters or control chars
+    if (text.includes('\uFFFD')) return false
+
+    // Count letters vs non-readable characters
+    const letters = (text.match(/[a-zA-Z0-9\s.,;:\-_/@()]/g) || []).length
+    const ratio = letters / text.length
+    if (ratio < 0.85) return false
+
+    // Check for word structures (at least three 3+ letter words)
+    const words = text.match(/[a-zA-Z]{3,}/g) || []
+    return words.length >= 3
+  }
+
+  /**
    * Fallback text extractor from binary stream if PDF.js fails
    */
   private static fallbackBinaryTextExtractor(data: ArrayBuffer | Uint8Array): string {
@@ -243,7 +259,7 @@ export class CVParserService {
       }
     }
 
-    // Match text segments inside stream objects or BT...ET operators
+    // Match text segments inside uncompressed stream objects or BT...ET operators
     const textMatches: string[] = []
     const btRegex = /BT[\s\S]*?ET/g
     let match: RegExpExecArray | null
@@ -262,12 +278,22 @@ export class CVParserService {
     }
 
     if (textMatches.length > 10) {
-      return textMatches.join(' ')
+      const candidate = textMatches.join(' ')
+      if (this.isMeaningfulText(candidate)) {
+        return candidate
+      }
     }
 
-    // If still empty, grab all printable character sequences
+    // If still empty or candidate was rejected as noise
     const printableMatches = raw.match(/[A-Za-z0-9\s.,;:\-_/@()]{4,}/g)
-    return printableMatches ? printableMatches.join('\n') : 'Dokumen PDF tidak berisi teks yang dapat diekstrak.'
+    if (printableMatches) {
+      const candidate = printableMatches.join('\n')
+      if (this.isMeaningfulText(candidate)) {
+        return candidate
+      }
+    }
+
+    return 'Teks dokumen PDF tidak dapat diekstrak secara otomatis. Dokumen mungkin merupakan pindaian gambar (scan) atau terenkripsi. Silakan gunakan opsi Input / Paste CV Manual.'
   }
 
   /**

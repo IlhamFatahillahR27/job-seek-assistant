@@ -427,5 +427,66 @@ Kami mencari Senior Software Engineer yang handal dalam Vue 3 dan Golang.`
       expect(result.extractionMethod).toBe('ai')
       expect(result.platform).toBe('glints')
     })
+
+    it('should include inlineData in request payload when poster images are passed to extractJobWithAI', async () => {
+      let capturedBody: any = null
+
+      globalThis.fetch = vi.fn().mockImplementation(async (_url: string, init: any) => {
+        capturedBody = JSON.parse(init.body)
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            candidates: [
+              {
+                content: {
+                  parts: [
+                    {
+                      text: JSON.stringify({
+                        title: 'Software Development Admin',
+                        company: 'PT Wowrack Indonesia',
+                        location: 'Surabaya',
+                        workplaceType: 'Hybrid',
+                        description: 'Responsibilities: Collect daily developer reports, track sprint tickets on JIRA.',
+                        requirements: 'Requirements: Diploma or Bachelor in Informatics, good understanding of SDLC.',
+                        recruiterEmail: 'recruitment@wowrack.co.id',
+                      }),
+                    },
+                  ],
+                },
+              },
+            ],
+          }),
+        }
+      })
+
+      const result = await GeminiClientService.extractJobWithAI({
+        apiKey: 'valid-gemini-key',
+        pageText: 'hiresflow WE ARE HIRING! PT Wowrack Indonesia is looking for a Software Development Admin...',
+        url: 'https://www.instagram.com/p/DfEh3hck6g-/?img_index=3',
+        images: [
+          {
+            data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+            mimeType: 'image/png',
+          },
+        ],
+      })
+
+      expect(capturedBody).not.toBeNull()
+      const parts = capturedBody.contents[0].parts
+      expect(parts.length).toBe(2) // 1 image part + 1 text prompt part
+      expect(parts[0].inlineData).toBeDefined()
+      expect(parts[0].inlineData.mimeType).toBe('image/png')
+      expect(parts[0].inlineData.data).toContain('iVBORw0KGgoAAAANSUhEUg')
+
+      expect(result.title).toBe('Software Development Admin')
+      expect(result.company).toBe('PT Wowrack Indonesia')
+      expect(result.location).toBe('Surabaya')
+      expect(result.workplaceType).toBe('Hybrid')
+      expect(result.description).toContain('Responsibilities: Collect daily developer reports')
+      expect(result.requirements).toContain('Diploma or Bachelor in Informatics')
+      expect(result.recruiterEmail).toBe('recruitment@wowrack.co.id')
+      expect(result.platform).toBe('instagram')
+    })
   })
 })

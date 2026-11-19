@@ -4,6 +4,7 @@ import { LinkedInScraper } from './linkedin'
 import { GlintsScraper } from './glints'
 import { JobstreetScraper } from './jobstreet'
 import { IndeedScraper } from './indeed'
+import { InstagramScraper } from './instagram'
 import { UniversalScraper } from './universal'
 import { extractPageVisibleText } from './utils'
 
@@ -16,6 +17,7 @@ export const SCRAPER_REGISTRY: JobScraper[] = [
   new GlintsScraper(),
   new JobstreetScraper(),
   new IndeedScraper(),
+  new InstagramScraper(),
   new UniversalScraper(),
 ]
 
@@ -124,6 +126,7 @@ export function extractJobFromDocument(doc: Document, url: string): JobDetails {
     extractedAt: new Date().toISOString(),
     rawPageText: visibleText,
     extractionMethod: 'dom',
+    posterImages: scrapeResult.posterImages,
   }
 
   return jobDetails

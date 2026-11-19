@@ -74,18 +74,19 @@ SKEMA JSON OUTPUT:
 }`
 
   /**
-   * System Prompt strictly adhering to factual job vacancy extraction from page content
+   * System Prompt strictly adhering to factual job vacancy extraction from page content and attached poster images
    */
-  private static SYSTEM_PROMPT_JOB_EXTRACTION = `Anda adalah "AI Job Vacancy Extractor" yang objektif, teliti, dan berbasis fakta. Tugas Anda adalah membaca teks mentah halaman web lowongan kerja (<webpage_content>) dan mengekstrak rincian pekerjaan secara lengkap dan akurat ke dalam format JSON.
+  private static SYSTEM_PROMPT_JOB_EXTRACTION = `Anda adalah "AI Job Vacancy Extractor" yang objektif, teliti, dan berbasis fakta. Tugas Anda adalah membaca teks mentah halaman web lowongan kerja (<webpage_content>) serta menganalisis gambar poster lowongan kerja jika dilampirkan, dan mengekstrak rincian pekerjaan secara lengkap dan akurat ke dalam format JSON.
 
 ATURAN UTAMA:
-1. HANYA ekstrak fakta yang benar-benar tercantum di dalam teks halaman. DILARANG KERAS mengarang, menyimpulkan asumsi, atau menambahkan informasi yang tidak tertulis.
-2. Jika halaman memuat beberapa lowongan (misalnya daftar lowongan di kolom samping dan panel rincian di kolom utama), fokuslah secara eksklusif pada lowongan kerja yang sedang aktif ditampilkan di panel rincian.
-3. Ekstrak bagian tanggung jawab, tugas harian, dan ringkasan peran secara lengkap (jangan diringkas berlebihan) ke dalam properti "description".
-4. Ekstrak kualifikasi, keahlian teknis, dan syarat pengalaman ke dalam properti "requirements".
-5. Tentukan "workplaceType": "Remote" | "Hybrid" | "On-site" | "Unspecified".
-6. Ambil email kontak HR/perekrut jika tercantum ke dalam "recruiterEmail" (kosongkan string "" jika tidak ada).
-7. Output WAJIB dalam format JSON murni tanpa tanda petik markdown pengantar.
+1. HANYA ekstrak fakta yang benar-benar tercantum di dalam teks halaman atau gambar poster yang dilampirkan. DILARANG KERAS mengarang, menyimpulkan asumsi, atau menambahkan informasi yang tidak tertulis.
+2. Jika dilampirkan gambar poster/flyer lowongan kerja (khususnya pada postingan media sosial seperti Instagram), periksa dan baca teks di dalam gambar secara cermat karena rincian peran, tanggung jawab (responsibilities), kualifikasi (requirements), lokasi, dan email lamaran sering kali tercetak langsung pada gambar poster tersebut.
+3. Jika halaman memuat beberapa lowongan, fokuslah secara eksklusif pada lowongan kerja yang sedang aktif ditampilkan.
+4. Ekstrak bagian tanggung jawab, tugas harian, dan ringkasan peran secara lengkap ke dalam properti "description".
+5. Ekstrak kualifikasi, keahlian teknis, dan syarat pengalaman ke dalam properti "requirements".
+6. Tentukan "workplaceType": "Remote" | "Hybrid" | "On-site" | "Unspecified".
+7. Ambil email kontak HR/perekrut jika tercantum ke dalam "recruiterEmail" (kosongkan string "" jika tidak ada).
+8. Output WAJIB dalam format JSON murni tanpa tanda petik markdown pengantar.
 
 SKEMA JSON OUTPUT:
 {
@@ -641,18 +642,19 @@ Berikan hasil evaluasi lengkap dalam format JSON yang valid.`
   /**
    * Helper to detect platform from vacancy URL
    */
-  static detectPlatformFromUrl(url: string): 'linkedin' | 'glints' | 'jobstreet' | 'indeed' | 'custom' {
+  static detectPlatformFromUrl(url: string): 'linkedin' | 'glints' | 'jobstreet' | 'indeed' | 'instagram' | 'custom' {
     const lower = url.toLowerCase()
     if (lower.includes('linkedin.com')) return 'linkedin'
     if (lower.includes('glints.com')) return 'glints'
     if (lower.includes('jobstreet.') || lower.includes('seek.com') || lower.includes('jobsdb.com')) return 'jobstreet'
     if (lower.includes('indeed.com')) return 'indeed'
+    if (lower.includes('instagram.com')) return 'instagram'
     return 'custom'
   }
 
   /**
    * AI-Powered Job Vacancy Extraction using Gemini
-   * Extracts clean structured job details from raw webpage text.
+   * Extracts clean structured job details from raw webpage text and optional poster images.
    */
   static async extractJobWithAI(options: {
     apiKey: string
@@ -660,6 +662,7 @@ Berikan hasil evaluasi lengkap dalam format JSON yang valid.`
     pageText: string
     url: string
     pageTitle?: string
+    images?: Array<{ data: string; mimeType?: string }>
     forceDemo?: boolean
   }): Promise<JobDetails> {
     if (options.forceDemo || !options.apiKey?.trim()) {
@@ -677,11 +680,33 @@ Berikan hasil evaluasi lengkap dalam format JSON yang valid.`
       )
     }
 
-    if (!options.pageText || options.pageText.trim().length < 30) {
-      throw new GeminiClientError('Teks halaman web kosong atau terlalu pendek untuk dianalisis oleh AI.')
+    const hasImages = !!(options.images && options.images.length > 0)
+    if ((!options.pageText || options.pageText.trim().length < 30) && !hasImages) {
+      throw new GeminiClientError('Teks halaman web atau poster gambar tidak tersedia untuk dianalisis oleh AI.')
     }
 
-    const userPrompt = `<webpage_url>${options.url}</webpage_url>\n<webpage_title>${options.pageTitle || ''}</webpage_title>\n<webpage_content>\n${options.pageText}\n</webpage_content>`
+    let userPrompt = `<webpage_url>${options.url}</webpage_url>\n<webpage_title>${options.pageTitle || ''}</webpage_title>\n<webpage_content>\n${options.pageText || ''}\n</webpage_content>`
+    if (hasImages) {
+      userPrompt += '\n\nPeriksa juga gambar poster lowongan kerja yang dilampirkan. Ekstrak seluruh informasi lowongan kerja termasuk rincian yang ada di dalam gambar poster (posisi, perusahaan, tanggung jawab/responsibilities, kualifikasi/requirements, lokasi, dan email perekrut).'
+    }
+
+    const contentParts: any[] = []
+    if (hasImages && options.images) {
+      for (const img of options.images) {
+        if (img.data) {
+          const rawBase64 = img.data.replace(/^data:[^;]+;base64,/, '').trim()
+          if (rawBase64) {
+            contentParts.push({
+              inlineData: {
+                mimeType: img.mimeType || 'image/jpeg',
+                data: rawBase64,
+              },
+            })
+          }
+        }
+      }
+    }
+    contentParts.push({ text: userPrompt })
 
     const payload = {
       systemInstruction: {
@@ -690,7 +715,7 @@ Berikan hasil evaluasi lengkap dalam format JSON yang valid.`
       contents: [
         {
           role: 'user',
-          parts: [{ text: userPrompt }],
+          parts: contentParts,
         },
       ],
       generationConfig: {
@@ -786,18 +811,48 @@ Berikan hasil evaluasi lengkap dalam format JSON yang valid.`
     const lines = pageText.split('\n').map((l) => l.trim()).filter((l) => l.length > 0)
     let title = pageTitle ? pageTitle.split(/[-|–]/)[0].trim() : 'Software Engineer'
     let company = 'Perusahaan'
+    let location = 'Indonesia'
+    let workplaceType: import('@/types/job').WorkplaceType = 'Hybrid'
+    let description = pageText.slice(0, 500) || 'Deskripsi pekerjaan diekstrak melalui simulasi AI.'
+    let requirements = 'Kualifikasi dan keahlian yang relevan dengan posisi kerja.'
+    let recruiterEmail = ''
 
-    for (const line of lines.slice(0, 10)) {
-      if (/engineer|developer|manager|specialist|analyst|designer|architect|lead/i.test(line) && line.length < 50) {
-        title = line
-        break
+    if (url.includes('instagram.com')) {
+      // Instagram caption pattern matching in demo mode
+      const lookingMatch = pageText.match(/looking for (?:a|an)?\s*([A-Za-z0-9\s/&–-]{3,40}?)(?:\s+to join|\s+in|\.|\!|\n)/i)
+      if (lookingMatch && lookingMatch[1]) {
+        title = lookingMatch[1].trim()
       }
-    }
+      const ptMatch = pageText.match(/(PT\s+[A-Za-z0-9\s.,&]+?)(?:\s+(?:is|sedang|membuka|looking|\n))/i)
+      if (ptMatch && ptMatch[1]) {
+        company = ptMatch[1].trim()
+      }
+      if (/surabaya/i.test(pageText)) location = 'Surabaya'
+      else if (/jakarta/i.test(pageText)) location = 'Jakarta'
+      else if (/bandung/i.test(pageText)) location = 'Bandung'
 
-    for (const line of lines.slice(0, 15)) {
-      if (/PT\s+[A-Z]|Inc|Corp|Ltd|Technologies|Solutions|Asia/i.test(line) && line.length < 50) {
-        company = line
-        break
+      if (/hybrid/i.test(pageText)) workplaceType = 'Hybrid'
+      else if (/remote/i.test(pageText)) workplaceType = 'Remote'
+      else if (/on-site|onsite|wfo/i.test(pageText)) workplaceType = 'On-site'
+
+      const emailMatch = pageText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)
+      if (emailMatch) recruiterEmail = emailMatch[0]
+
+      description = `Ringkasan Lowongan Instagram: ${pageText.slice(0, 400).trim()}\n\n(Catatan Demo: Untuk membaca rincian tanggung jawab dan syarat lengkap langsung dari poster gambar, masukkan Gemini API Key di tab Pengaturan).`
+      requirements = 'Requirements dan kualifikasi lengkap tercantum di poster gambar Instagram.'
+    } else {
+      for (const line of lines.slice(0, 10)) {
+        if (/engineer|developer|manager|specialist|analyst|designer|architect|lead/i.test(line) && line.length < 50) {
+          title = line
+          break
+        }
+      }
+
+      for (const line of lines.slice(0, 15)) {
+        if (/PT\s+[A-Z]|Inc|Corp|Ltd|Technologies|Solutions|Asia/i.test(line) && line.length < 50) {
+          company = line
+          break
+        }
       }
     }
 
@@ -806,11 +861,11 @@ Berikan hasil evaluasi lengkap dalam format JSON yang valid.`
       url,
       title,
       company,
-      location: 'Indonesia',
-      workplaceType: 'Hybrid',
-      description: pageText.slice(0, 500) || 'Deskripsi pekerjaan diekstrak melalui simulasi AI.',
-      requirements: 'Kualifikasi dan keahlian yang relevan dengan posisi kerja.',
-      recruiterEmail: '',
+      location,
+      workplaceType,
+      description,
+      requirements,
+      recruiterEmail,
       platform: this.detectPlatformFromUrl(url),
       extractedAt: new Date().toISOString(),
       rawPageText: pageText,

@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { Sparkles, Sun, Moon, Key, FileCheck, FileX, Cloud, CloudOff } from 'lucide-vue-next'
 import { useAppSettings, useCVProfile, useTheme, useSession } from '@/composables/useStorageState'
+import pkg from '../../../package.json' with { type: 'json' }
 
 const { settings } = useAppSettings()
 const { cvProfile } = useCVProfile()
@@ -26,7 +27,7 @@ const isDark = computed(() => settings.value.theme === 'dark')
           Job Seek Assistant
         </h1>
         <span class="rounded bg-indigo-50 px-1 py-0.2 text-[9px] font-semibold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
-          v1.1.0
+          v{{ pkg.version }}
         </span>
       </div>
     </div>

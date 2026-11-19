@@ -76,4 +76,27 @@ Developed web applications`
     expect(extracted).toBeTruthy()
     expect(typeof extracted).toBe('string')
   })
+
+  it('should cleanly extract text from real evidence PDF without binary noise or replacement characters', async () => {
+    const fs = await import('node:fs')
+    const path = await import('node:path')
+    const evidencePdfPath = path.resolve(process.cwd(), 'docs/evidence/CV - Ilham Fatahillah Ridwan - 2026-09-17.pdf')
+
+    if (fs.existsSync(evidencePdfPath)) {
+      const buf = fs.readFileSync(evidencePdfPath)
+      const text = await CVParserService.extractTextFromPdf(buf)
+
+      expect(text.length).toBeGreaterThan(1000)
+      expect(text).toContain('Ilham Fatahillah Ridwan')
+      expect(text).not.toContain('\uFFFD')
+
+      const profile = CVParserService.parseTextToProfile(text, {
+        fileName: 'CV - Ilham Fatahillah Ridwan - 2026-09-17.pdf',
+        source: 'google_drive',
+      })
+
+      expect(profile.headline).toBeTruthy()
+      expect(profile.skills.length).toBeGreaterThan(0)
+    }
+  })
 })

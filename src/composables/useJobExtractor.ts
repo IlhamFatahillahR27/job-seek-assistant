@@ -106,24 +106,82 @@ export function useJobExtractor() {
           jobData.url = url
         }
 
+        const isInstagram = jobData.platform === 'instagram' || url.includes('instagram.com')
+        const hasPosterImages = !!(jobData.posterImages && jobData.posterImages.length > 0)
         const isDescIncomplete =
           !jobData.description ||
           jobData.description.trim().length < 50 ||
           jobData.description.includes('tidak ditemukan')
 
-        const shouldRunAi = options?.forceAi || (isDescIncomplete && !!jobData.rawPageText)
+        const shouldRunAi = options?.forceAi || isInstagram || hasPosterImages || (isDescIncomplete && !!jobData.rawPageText)
 
-        if (shouldRunAi && jobData.rawPageText) {
+        if (shouldRunAi) {
           try {
             isExtractingAi.value = true
             const hasApiKey = !!settings.value.geminiApiKey?.trim()
 
+            // Prepare images if extracting from Instagram or page with poster images
+            const imagesForAi: Array<{ data: string; mimeType: string }> = []
+
+            if (hasPosterImages && jobData.posterImages) {
+              for (const imgUrl of jobData.posterImages.slice(0, 3)) {
+                if (imgUrl.startsWith('data:')) {
+                  const mime = imgUrl.substring(imgUrl.indexOf(':') + 1, imgUrl.indexOf(';')) || 'image/jpeg'
+                  const b64 = imgUrl.split(',')[1]
+                  if (b64) imagesForAi.push({ data: b64, mimeType: mime })
+                } else {
+                  // Fetch image from URL in extension context
+                  try {
+                    const res = await fetch(imgUrl)
+                    if (res.ok) {
+                      const blob = await res.blob()
+                      const b64 = await new Promise<string | null>((resolve) => {
+                        const reader = new FileReader()
+                        reader.onloadend = () => {
+                          const resStr = reader.result as string
+                          resolve(resStr ? resStr.split(',')[1] || null : null)
+                        }
+                        reader.onerror = () => resolve(null)
+                        reader.readAsDataURL(blob)
+                      })
+                      if (b64) {
+                        imagesForAi.push({ data: b64, mimeType: blob.type || 'image/jpeg' })
+                      }
+                    }
+                  } catch (fetchErr) {
+                    console.warn('[useJobExtractor] Could not fetch poster image URL:', imgUrl, fetchErr)
+                  }
+                }
+              }
+            }
+
+            // If on Instagram and direct image download was empty/blocked, capture visible tab as seamless fallback
+            if (isInstagram && imagesForAi.length === 0) {
+              try {
+                if (chrome.tabs && chrome.tabs.captureVisibleTab) {
+                  const dataUrl = await chrome.tabs.captureVisibleTab(activeTab.windowId || (null as any), {
+                    format: 'jpeg',
+                    quality: 85,
+                  })
+                  if (dataUrl) {
+                    const b64 = dataUrl.split(',')[1]
+                    if (b64) {
+                      imagesForAi.push({ data: b64, mimeType: 'image/jpeg' })
+                    }
+                  }
+                }
+              } catch (captureErr) {
+                console.warn('[useJobExtractor] captureVisibleTab fallback encountered an issue:', captureErr)
+              }
+            }
+
             const aiJob = await GeminiClientService.extractJobWithAI({
               apiKey: settings.value.geminiApiKey || '',
               model: settings.value.geminiModel,
-              pageText: jobData.rawPageText,
+              pageText: jobData.rawPageText || jobData.description || '',
               url: jobData.url,
               pageTitle: activeTab.title,
+              images: imagesForAi.length > 0 ? imagesForAi : undefined,
               forceDemo: !hasApiKey,
             })
 
@@ -131,13 +189,16 @@ export function useJobExtractor() {
               ...aiJob,
               id: jobData.id || aiJob.id,
               url: jobData.url,
+              platform: jobData.platform || aiJob.platform,
               title: aiJob.title && !aiJob.title.includes('Software Engineer') ? aiJob.title : jobData.title || aiJob.title,
               company: aiJob.company && !aiJob.company.includes('Perusahaan') ? aiJob.company : jobData.company || aiJob.company,
+              posterImages: jobData.posterImages,
               extractionMethod: 'ai',
             }
 
             await saveCurrentJob(jobData)
-            successMessage.value = `Berhasil mengekstrak "${jobData.title}" dari ${jobData.company} menggunakan Gemini AI ✨`
+            const methodLabel = imagesForAi.length > 0 ? 'Gemini AI Vision ✨' : 'Gemini AI ✨'
+            successMessage.value = `Berhasil mengekstrak "${jobData.title}" dari ${jobData.company} menggunakan ${methodLabel}`
             return jobData
           } catch (aiErr: any) {
             console.warn('[useJobExtractor] AI extraction encountered an issue, keeping DOM data:', aiErr)
